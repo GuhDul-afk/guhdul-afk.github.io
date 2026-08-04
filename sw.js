@@ -6,7 +6,7 @@
 //
 // IMPORTANT : à chaque modification de l'appli, incrémenter CACHE_NAME
 // (v2, v3, ...) pour que le navigateur détecte que ce fichier a changé.
-const CACHE_NAME = 'carnet-de-bord-v2';
+const CACHE_NAME = 'carnet-de-bord-v3';
 const FILES_TO_CACHE = [
   './',
   './index.html',
@@ -35,9 +35,12 @@ self.addEventListener('fetch', (event) => {
   const isHtmlPage = event.request.mode === 'navigate' || event.request.url.endsWith('index.html');
 
   if(isHtmlPage){
-    // Réseau prioritaire pour la page principale : toujours la dernière version si possible.
+    // Réseau prioritaire pour la page principale, ET on force le contournement
+    // du cache HTTP classique du navigateur (cache: 'no-store') — sinon le
+    // navigateur peut renvoyer une copie HTTP en mémoire sans jamais recontacter
+    // le serveur, même si le service worker demande bien une requête réseau.
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-store' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
