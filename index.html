@@ -352,6 +352,7 @@ const ICONS = {
   trash:'<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
   history:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/><path d="M4 5v4h4"/>',
   note:'<path d="M5 3h11l4 4v14H5z"/><path d="M15 3v5h5"/><path d="M8 12h8"/><path d="M8 16h5"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 15.3-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.36L3 16"/><path d="M3 21v-5h5"/>',
 };
 
 let vehicles = [];
@@ -367,6 +368,7 @@ let notifUnsupported = false;
 let currentView = 'dashboard';
 let notesSaveTimer = null;
 let saveError = null;
+let updateMsg = null;
 let lightboxSrc = null;
 let setupBrand = '';
 let setupModel = '';
@@ -855,6 +857,7 @@ function render(){
   const app = document.getElementById('app');
   const bellBtn = `<button class="bell-btn ${notifOn?'on':''}" onclick="toggleNotif()" title="${notifOn?'Désactiver':'Activer'} les rappels"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.bell}</svg></button>`;
   const pdfBtn = `<button class="bell-btn" onclick="exportPDF()" title="Exporter en PDF"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.download}</svg></button>`;
+  const updateBtn = `<button class="bell-btn" onclick="checkForUpdates()" title="Vérifier les mises à jour"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.refresh}</svg></button>`;
 
   const header = `
     <div class="topbar">
@@ -862,10 +865,11 @@ function render(){
         <div class="brand-mark">Carnet de <span>Bord</span></div>
         <div class="brand-tag">Ton copilote entretien auto</div>
       </div>
-      ${vehicles.length > 0 ? `<div class="header-actions">${pdfBtn}${bellBtn}</div>` : ''}
+      ${vehicles.length > 0 ? `<div class="header-actions">${updateBtn}${pdfBtn}${bellBtn}</div>` : ''}
     </div>`;
 
   const saveErrorBanner = saveError ? `<div class="banner danger">${saveError}</div>` : '';
+  const updateMsgBanner = updateMsg ? `<div class="banner ok">${updateMsg}</div>` : '';
   const lightboxHtml = lightboxSrc ? `
     <div class="lightbox-backdrop" onclick="closeLightbox()">
       <img src="${lightboxSrc}" onclick="event.stopPropagation()" />
@@ -876,6 +880,7 @@ function render(){
     app.innerHTML = `
       ${header}
       ${saveErrorBanner}
+      ${updateMsgBanner}
       ${vehicles.length > 0 ? renderTabs() : ''}
       <div class="setup-card">
         <h2>${vehicles.length===0 ? 'Configure ton véhicule' : 'Ajouter un véhicule'}</h2>
@@ -1108,6 +1113,7 @@ function render(){
   app.innerHTML = `
     ${header}
     ${saveErrorBanner}
+    ${updateMsgBanner}
     ${renderTabs()}
     ${viewTabs}
     ${bodyHtml}
@@ -1460,6 +1466,27 @@ function exportPDF(){
 }
 
 loadData();
+
+// Vérification manuelle de mise à jour (bouton 🔄) : redemande explicitement
+// au service worker de vérifier une nouvelle version, puis recharge la page.
+// Grâce à la stratégie réseau prioritaire du service worker, ce rechargement
+// va systématiquement chercher index.html frais sur le réseau.
+async function checkForUpdates(){
+  updateMsg = 'Vérification en cours…';
+  render();
+  try{
+    if('serviceWorker' in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg) await reg.update();
+    }
+    updateMsg = 'À jour — rechargement…';
+    render();
+    setTimeout(() => window.location.reload(), 500);
+  }catch(e){
+    updateMsg = "Vérification impossible pour le moment (pas de connexion ?). L'appli continue de fonctionner avec la dernière version enregistrée sur ce téléphone.";
+    render();
+  }
+}
 
 // Le service worker ne s'enregistre que si le fichier est réellement hébergé
 // (http/https) — inutile et sans effet dans l'aperçu Claude.
