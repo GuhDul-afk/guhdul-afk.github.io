@@ -33,16 +33,34 @@
     --glass-blur:blur(26px) saturate(180%);
     --glass-shadow:0 8px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10);
   }
+  /* Thème clair : mêmes principes (fond uni + taches floues + verre dépoli),
+     pas juste des couleurs inversées. Contraste retravaillé partout où le texte
+     clair fixe du thème sombre deviendrait illisible sur fond clair. */
+  body.light{
+    --bg:#EEF0F3;
+    --panel:rgba(255,255,255,0.55);
+    --panel-2:rgba(255,255,255,0.75);
+    --line:rgba(20,24,28,0.10);
+    --text:#15181C;
+    --text-dim:rgba(21,24,28,0.60);
+    --accent:#0E9C89;
+    --accent-dim:rgba(14,156,137,0.14);
+    --ok:#1C9A4B;
+    --warn:#B4650A;
+    --danger:#D8362A;
+    --glass-shadow:0 8px 26px rgba(20,24,28,0.10), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
   *{box-sizing:border-box;}
   html, body{overflow-x:hidden;}
   body{
     margin:0;
-    background:#000;
+    background:var(--bg);
     color:var(--text);
     font-family:var(--font-body);
     min-height:100vh;
     -webkit-font-smoothing:antialiased;
     position:relative;
+    transition:background .25s ease, color .25s ease;
   }
   /* Taches de couleur floues fixes derrière l'interface : c'est ce qui donne
      de la matière aux panneaux en verre dépoli quand ils les recouvrent. */
@@ -54,9 +72,12 @@
     opacity:0.4;
     z-index:-1;
     pointer-events:none;
+    transition:opacity .25s ease;
   }
   body::before{ width:440px; height:440px; background:var(--accent); top:-140px; left:-120px; }
   body::after{ width:400px; height:400px; background:#7B61FF; bottom:-120px; right:-100px; opacity:0.3; }
+  body.light::before{ opacity:0.22; }
+  body.light::after{ opacity:0.16; background:#6C5CE7; }
   #app{max-width:760px;margin:0 auto;padding:20px 16px 60px;position:relative;}
 
   input, select, textarea{ font-family:inherit; }
@@ -199,6 +220,9 @@
   .banner.danger{background:rgba(255,69,58,0.14);border-color:rgba(255,69,58,0.4);color:#FFB4AE;}
   .banner.warn{background:rgba(255,159,10,0.14);border-color:rgba(255,159,10,0.4);color:#FFD199;}
   .banner.ok{background:rgba(48,209,88,0.12);border-color:rgba(48,209,88,0.35);color:#9CF0B0;}
+  body.light .banner.danger{background:rgba(216,54,42,0.10);border-color:rgba(216,54,42,0.32);color:#A32718;}
+  body.light .banner.warn{background:rgba(180,101,10,0.10);border-color:rgba(180,101,10,0.30);color:#8A4E08;}
+  body.light .banner.ok{background:rgba(28,154,75,0.10);border-color:rgba(28,154,75,0.28);color:#166B38;}
   .banner svg{width:16px;height:16px;flex-shrink:0;}
 
   /* Dashboard cluster */
@@ -353,6 +377,8 @@ const ICONS = {
   history:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/><path d="M4 5v4h4"/>',
   note:'<path d="M5 3h11l4 4v14H5z"/><path d="M15 3v5h5"/><path d="M8 12h8"/><path d="M8 16h5"/>',
   refresh:'<path d="M3 12a9 9 0 0 1 15.3-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.36L3 16"/><path d="M3 21v-5h5"/>',
+  sun:'<circle cx="12" cy="12" r="4.5"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/><line x1="4.9" y1="4.9" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.1" y2="4.9"/>',
+  moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
 };
 
 let vehicles = [];
@@ -370,6 +396,7 @@ let notesSaveTimer = null;
 let saveError = null;
 let updateMsg = null;
 let lightboxSrc = null;
+let theme = 'dark';
 let setupBrand = '';
 let setupModel = '';
 let setupEngine = '';
@@ -474,6 +501,7 @@ async function loadData(){
         vehicles = data.vehicles;
         activeId = data.activeId || (vehicles[0] && vehicles[0].id);
         notifOn = !!data.notifOn;
+        theme = data.theme === 'light' ? 'light' : 'dark';
       }else if(data.vehicle){
         // migration depuis l'ancien format mono-véhicule
         const v = { id: 'v1', name: data.vehicle.name, km: data.vehicle.km, items: data.items };
@@ -486,6 +514,20 @@ async function loadData(){
   }catch(e){
     // pas encore de données enregistrées
   }
+  applyTheme();
+  render();
+}
+
+function applyTheme(){
+  document.body.classList.toggle('light', theme === 'light');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', theme === 'light' ? '#F2F3F5' : '#000000');
+}
+
+function toggleTheme(){
+  theme = theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  persist();
   render();
 }
 
@@ -541,7 +583,7 @@ function coreVehiclesPayload(){
 
 async function persist(){
   try{
-    const payload = JSON.stringify({ vehicles: coreVehiclesPayload(), activeId, notifOn });
+    const payload = JSON.stringify({ vehicles: coreVehiclesPayload(), activeId, notifOn, theme });
     await window.storage.set(STORAGE_KEY, payload);
     if(saveError){ saveError = null; render(); }
   }catch(e){
@@ -858,6 +900,7 @@ function render(){
   const bellBtn = `<button class="bell-btn ${notifOn?'on':''}" onclick="toggleNotif()" title="${notifOn?'Désactiver':'Activer'} les rappels"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.bell}</svg></button>`;
   const pdfBtn = `<button class="bell-btn" onclick="exportPDF()" title="Exporter en PDF"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.download}</svg></button>`;
   const updateBtn = `<button class="bell-btn" onclick="checkForUpdates()" title="Vérifier les mises à jour"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.refresh}</svg></button>`;
+  const themeBtn = `<button class="bell-btn" onclick="toggleTheme()" title="${theme==='dark' ? 'Passer en thème clair' : 'Passer en thème sombre'}"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${theme==='dark' ? ICONS.sun : ICONS.moon}</svg></button>`;
 
   const header = `
     <div class="topbar">
@@ -865,7 +908,7 @@ function render(){
         <div class="brand-mark">Carnet de <span>Bord</span></div>
         <div class="brand-tag">Ton copilote entretien auto</div>
       </div>
-      ${vehicles.length > 0 ? `<div class="header-actions">${updateBtn}${pdfBtn}${bellBtn}</div>` : ''}
+      <div class="header-actions">${vehicles.length > 0 ? `${updateBtn}${pdfBtn}${bellBtn}` : ''}${themeBtn}</div>
     </div>`;
 
   const saveErrorBanner = saveError ? `<div class="banner danger">${saveError}</div>` : '';
