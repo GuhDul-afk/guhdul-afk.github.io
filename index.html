@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carnet de Bord — Entretien auto</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carnet de Bord">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000000;
+    --panel:rgba(255,255,255,0.055);
+    --panel-2:rgba(255,255,255,0.09);
+    --line:rgba(255,255,255,0.14);
+    --text:#F5F5F7;
+    --text-dim:rgba(245,245,247,0.58);
+    --accent:#38E1CB;
+    --accent-dim:rgba(56,225,203,0.16);
+    --ok:#30D158;
+    --warn:#FF9F0A;
+    --danger:#FF453A;
+    --font-display:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',sans-serif;
+    --font-mono:ui-monospace,'SF Mono','JetBrains Mono',monospace;
+    --glass-blur:blur(26px) saturate(180%);
+    --glass-shadow:0 8px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10);
+  }
+  *{box-sizing:border-box;}
+  html, body{overflow-x:hidden;}
+  body{
+    margin:0;
+    background:#000;
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+  }
+  /* Taches de couleur floues fixes derrière l'interface : c'est ce qui donne
+     de la matière aux panneaux en verre dépoli quand ils les recouvrent. */
+  body::before, body::after{
+    content:'';
+    position:fixed;
+    border-radius:50%;
+    filter:blur(90px);
+    opacity:0.4;
+    z-index:-1;
+    pointer-events:none;
+  }
+  body::before{ width:440px; height:440px; background:var(--accent); top:-140px; left:-120px; }
+  body::after{ width:400px; height:400px; background:#7B61FF; bottom:-120px; right:-100px; opacity:0.3; }
+  #app{max-width:760px;margin:0 auto;padding:20px 16px 60px;position:relative;}
+
+  input, select, textarea{ font-family:inherit; }
+  input[type="number"], input[type="text"], input[type="date"]{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+    padding:8px 10px; color:var(--text); font-family:var(--font-mono);
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,225,203,0.18); }
+
+  /* Header */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:20px; padding:14px 18px; box-shadow:var(--glass-shadow);
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand-mark{font-family:var(--font-display);font-size:19px;letter-spacing:-0.3px;font-weight:700;}
+  .brand-mark span{color:var(--accent);}
+  .brand-tag{font-size:12px;color:var(--text-dim);}
+  .bell-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .bell-btn svg{width:17px;height:17px;stroke:var(--text-dim);}
+  .bell-btn.on{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 14px rgba(56,225,203,0.35);}
+  .bell-btn.on svg{stroke:var(--accent);}
+  .header-actions{display:flex;gap:8px;flex-shrink:0;}
+
+  /* View tabs (segmented control façon Apple) */
+  .view-tabs{
+    display:flex;gap:4px;margin-bottom:18px;padding:4px;
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:16px; box-shadow:var(--glass-shadow);
+  }
+  .view-tab{flex:1;border-radius:12px;padding:9px;text-align:center;font-size:12.5px;font-weight:500;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s ease,color .15s ease;}
+  .view-tab svg{width:14px;height:14px;stroke:var(--text-dim);}
+  .view-tab.active{background:rgba(255,255,255,0.14);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);}
+  .view-tab.active svg{stroke:var(--accent);}
+
+  /* History */
+  .history-list{display:flex;flex-direction:column;gap:8px;}
+  .history-entry{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:16px; padding:12px 14px; display:flex;align-items:center;gap:12px;
+  }
+  .history-entry .card-icon{width:32px;height:32px;flex-shrink:0;}
+  .history-entry .card-icon svg{width:16px;height:16px;stroke:var(--text-dim);}
+  .history-main{flex:1;min-width:0;}
+  .history-name{font-family:var(--font-display);font-size:13px;font-weight:600;}
+  .history-meta{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;}
+  .empty-state{text-align:center;padding:40px 16px;color:var(--text-dim);font-size:13px;}
+
+  /* Notes (style Google Keep) */
+  .notes-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .note-card{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:18px; padding:12px; display:flex;flex-direction:column;gap:8px;
+    box-shadow:var(--glass-shadow);
+  }
+  .note-add-card{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1.5px dashed var(--line); border-radius:18px; display:flex;align-items:center;justify-content:center;gap:6px;
+    cursor:pointer;color:var(--accent);font-size:13px;min-height:80px;grid-column:1 / -1;
+  }
+  .note-textarea{width:100%;background:transparent;border:none;color:var(--text);font-family:var(--font-body);font-size:12.5px;line-height:1.5;resize:vertical;min-height:60px;padding:0;}
+  .note-textarea:focus{outline:none;box-shadow:none;}
+  .note-images{display:flex;flex-wrap:wrap;gap:6px;}
+  .note-img-wrap{position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;flex-shrink:0;}
+  .note-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+  .note-img-remove{position:absolute;top:1px;right:1px;background:rgba(0,0,0,0.65);border:none;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .note-footer{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:2px;}
+  .note-date{font-size:10px;color:var(--text-dim);opacity:0.7;font-family:var(--font-mono);}
+  .note-actions{display:flex;gap:6px;}
+  .note-icon-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:50%;width:27px;height:27px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .note-icon-btn svg{width:13px;height:13px;stroke:var(--text-dim);}
+  .note-icon-btn:hover{background:rgba(255,255,255,0.16);}
+  .note-icon-btn:hover svg{stroke:var(--text);}
+  @media (max-width:520px){ .notes-grid{grid-template-columns:1fr;} .note-add-card{grid-column:auto;} }
+
+  /* Lightbox photo */
+  .lightbox-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px;}
+  .lightbox-backdrop img{max-width:100%;max-height:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.6);}
+  .lightbox-close{position:fixed;top:18px;right:18px;background:var(--panel);backdrop-filter:var(--glass-blur);border:1px solid var(--line);color:var(--text);width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+  /* Loading */
+  .loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-dim);font-family:var(--font-mono);font-size:13px;letter-spacing:0.5px;}
+
+  /* Vehicle tabs */
+  .vtabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;}
+  .vtab{
+    flex-shrink:0;background:var(--panel);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:999px;padding:8px 14px;font-size:12.5px;color:var(--text-dim);
+    cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+  .vtab.active{border-color:var(--accent);color:var(--text);background:var(--accent-dim);box-shadow:0 0 12px rgba(56,225,203,0.25);}
+  .vtab .dot{width:7px;height:7px;border-radius:50%;}
+  .vtab.add{color:var(--accent);border-style:dashed;}
+
+  /* Setup form */
+  .setup-card{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:24px; padding:28px 22px; margin-top:20px; box-shadow:var(--glass-shadow);
+  }
+  .setup-card h2{font-family:var(--font-display);font-size:20px;font-weight:700;letter-spacing:-0.2px;margin:0 0 6px;}
+  .setup-card p{color:var(--text-dim);font-size:13px;margin:0 0 22px;line-height:1.5;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;}
+  .field input, .field select{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+    padding:12px 12px;color:var(--text);font-family:var(--font-mono);font-size:16px;
+  }
+  .field select{font-family:var(--font-body);font-size:14px;-webkit-appearance:none;appearance:none;}
+  /* Le popup natif des <option> reste à fond clair quel que soit le thème de la
+     page (le navigateur ne laisse pas le CSS le personnaliser) — on force donc
+     un texte foncé pour ces options précises, sinon texte clair sur fond clair. */
+  .field select option{ color:#111; background:#fff; }
+  .field input:focus, .field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,225,203,0.18);}
+  .setup-actions{display:flex;gap:8px;}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    background:linear-gradient(180deg, #3FEBD4, #26C7B0);
+    color:#042420;border:none;border-radius:999px;
+    font-family:var(--font-body);font-weight:600;font-size:14px;padding:11px 20px;
+    cursor:pointer;transition:transform 0.1s ease, opacity 0.15s ease;
+    box-shadow:0 4px 16px rgba(56,225,203,0.35), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .btn:hover{opacity:0.92;}
+  .btn:active{transform:scale(0.97);}
+  .btn-ghost{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    color:var(--text-dim);border:1px solid var(--line); box-shadow:none;
+  }
+  .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.3);opacity:1;}
+  .btn-block{width:100%;}
+  .btn-sm{padding:8px 14px;font-size:12.5px;}
+  .btn-danger{background:linear-gradient(180deg, #FF6259, #E8382D);color:#fff;box-shadow:0 4px 16px rgba(255,69,58,0.35), inset 0 1px 0 rgba(255,255,255,0.3);}
+
+  /* Alert banner */
+  .banner{
+    border-radius:16px;padding:13px 16px;margin-bottom:18px;display:flex;align-items:center;gap:10px;font-size:13px;border:1px solid;
+    backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  }
+  .banner.danger{background:rgba(255,69,58,0.14);border-color:rgba(255,69,58,0.4);color:#FFB4AE;}
+  .banner.warn{background:rgba(255,159,10,0.14);border-color:rgba(255,159,10,0.4);color:#FFD199;}
+  .banner.ok{background:rgba(48,209,88,0.12);border-color:rgba(48,209,88,0.35);color:#9CF0B0;}
+  .banner svg{width:16px;height:16px;flex-shrink:0;}
+
+  /* Dashboard cluster */
+  .cluster{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:26px;}
+  .cluster-panel{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:20px; padding:18px; display:flex;flex-direction:column;
+    align-items:center;text-align:center;gap:10px; box-shadow:var(--glass-shadow);
+  }
+  .cluster-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);}
+  .score-value{font-family:var(--font-display);font-size:15px;font-weight:700;}
+  .score-value.ok{color:var(--ok);}
+  .score-value.warn{color:var(--warn);}
+  .score-value.danger{color:var(--danger);}
+  .odo-value{font-family:var(--font-mono);font-size:26px;font-weight:700;letter-spacing:0.5px;background:var(--panel-2);border-radius:14px;padding:8px 14px;border:1px solid var(--line);}
+  .vehicle-name{font-family:var(--font-display);font-size:13px;font-weight:600;color:var(--text-dim);margin-bottom:-4px;}
+
+  .ring-wrap{position:relative;width:96px;height:96px;}
+  .ring-wrap svg{transform:rotate(-90deg);}
+  .ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;}
+  .ring-center b{font-family:var(--font-mono);font-size:18px;}
+
+  /* Section title */
+  .section-title{font-family:var(--font-display);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin:26px 0 12px;display:flex;align-items:center;gap:8px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--line);}
+
+  /* Cards grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .card{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line); border-radius:18px; padding:14px; position:relative;
+    box-shadow:var(--glass-shadow); transition:border-color 0.15s ease;
+  }
+  .card[data-status="danger"]{border-color:rgba(255,69,58,0.55);}
+  .card[data-status="warn"]{border-color:rgba(255,159,10,0.5);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .card-icon{width:34px;height:34px;border-radius:10px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .card-icon svg{width:18px;height:18px;stroke:var(--text-dim);}
+  .card[data-status="danger"] .card-icon svg{stroke:var(--danger);}
+  .card[data-status="warn"] .card-icon svg{stroke:var(--warn);}
+  .card-name{font-family:var(--font-display);font-size:13.5px;font-weight:600;margin:10px 0 2px;line-height:1.25;}
+  .card-status-text{font-family:var(--font-mono);font-size:12px;margin-bottom:2px;}
+  .card-status-text.ok{color:var(--ok);}
+  .card-status-text.warn{color:var(--warn);}
+  .card-status-text.danger{color:var(--danger);}
+  .card-meta{font-size:11px;color:var(--text-dim);margin-bottom:10px;}
+  .card-actions{display:flex;gap:6px;}
+  .ring-mini{width:40px;height:40px;flex-shrink:0;}
+  .ring-mini svg{transform:rotate(-90deg);width:40px;height:40px;}
+
+  .edit-form{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:10px;}
+  .edit-section-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);font-weight:600;}
+  .edit-row{display:flex;gap:8px;}
+  .edit-field{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .edit-field label{font-size:10.5px;color:var(--text-dim);line-height:1.3;}
+  .edit-field input{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--text);font-family:var(--font-mono);font-size:12.5px;width:100%;}
+  .edit-hint{font-size:10.5px;color:var(--text-dim);opacity:0.75;line-height:1.4;margin:-2px 0 2px;}
+  .radio-opt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;}
+  .radio-opt input{accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;}
+
+  .odo-editor{display:flex;gap:8px;margin-top:4px;}
+  .odo-editor input{width:110px;text-align:center;}
+
+  .vehicle-tools{text-align:center;margin-top:6px;}
+  .footer-link{display:inline-block;text-align:center;margin-top:34px;font-size:11.5px;color:var(--text-dim);opacity:0.7;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:var(--font-body);}
+  .footer-link:hover{opacity:1;color:var(--text);}
+  .footer-row{display:flex;justify-content:center;gap:18px;}
+  .confirm-box{
+    background:rgba(255,69,58,0.12); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px solid rgba(255,69,58,0.4); border-radius:16px; padding:14px; margin-top:20px; text-align:center;
+  }
+  .confirm-text{font-size:12.5px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;}
+  .confirm-actions{display:flex;gap:8px;justify-content:center;}
+  .save-note{text-align:center;font-size:11px;color:var(--text-dim);margin-top:8px;opacity:0.7;}
+  .notif-hint{font-size:11px;color:var(--text-dim);text-align:center;margin-top:8px;line-height:1.5;opacity:0.8;}
+
+  @media (max-width:520px){
+    .grid{grid-template-columns:1fr;}
+    .cluster{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Chargement du carnet…</div></div>
+
+<script>
+/* Le stockage window.storage est propre à l'aperçu Claude. Une fois ce fichier
+   hébergé ailleurs (GitHub Pages, etc.), on bascule automatiquement sur
+   localStorage, qui reproduit la même interface (get/set/delete/list) —
+   aucun autre changement n'est nécessaire dans le reste du code. */
+if(typeof window.storage === 'undefined'){
+  window.storage = {
+    async get(key){
+      const raw = localStorage.getItem(key);
+      if(raw === null) throw new Error('Key not found: ' + key);
+      return { key, value: raw, shared: false };
+    },
+    async set(key, value){
+      localStorage.setItem(key, value);
+      return { key, value, shared: false };
+    },
+    async delete(key){
+      const existed = localStorage.getItem(key) !== null;
+      localStorage.removeItem(key);
+      return { key, deleted: existed, shared: false };
+    },
+    async list(prefix){
+      const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
+      return { keys, prefix, shared: false };
+    },
+  };
+}
+
+const STORAGE_KEY = 'car-data';
+
+const DEFAULT_ITEMS = [
+  { id:'vidange',     name:'Vidange moteur',            icon:'drop',    mode:'km',   intervalKm:10000, intervalMonths:null },
+  { id:'niveau_huile',name:"Niveau d'huile",             icon:'gauge',   mode:'km',   intervalKm:1000,  intervalMonths:null },
+  { id:'pression',    name:'Pression des pneus',         icon:'gauge',   mode:'date', intervalKm:null,  intervalMonths:1    },
+  { id:'usure_pneus', name:'Usure des pneus',            icon:'tire',    mode:'km',   intervalKm:5000,  intervalMonths:null },
+  { id:'filtres',     name:'Filtres (air / habitacle)',  icon:'filter',  mode:'km',   intervalKm:15000, intervalMonths:null },
+  { id:'freins',      name:'Plaquettes de frein',        icon:'disc',    mode:'km',   intervalKm:20000, intervalMonths:null },
+  { id:'revision',    name:'Révision générale',          icon:'wrench',  mode:'km',   intervalKm:20000, intervalMonths:null },
+  { id:'ct',          name:'Contrôle technique',         icon:'clipboard',mode:'date',intervalKm:null,  intervalMonths:24,  lockedMode:true },
+];
+
+const ICONS = {
+  drop:'<path d="M12 2s7 8 7 13a7 7 0 0 1-14 0c0-5 7-13 7-13z"/>',
+  gauge:'<circle cx="12" cy="13" r="8"/><line x1="12" y1="13" x2="16" y2="9"/><line x1="12" y1="6" x2="12" y2="7.5"/>',
+  tire:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><line x1="12" y1="3" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="3" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="21" y2="12"/>',
+  filter:'<path d="M4 4h16l-6.5 8v6.5l-3 1.5V12z"/>',
+  disc:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="7.5" r="1"/><circle cx="12" cy="16.5" r="1"/><circle cx="7.5" cy="12" r="1"/><circle cx="16.5" cy="12" r="1"/><circle cx="12" cy="12" r="2"/>',
+  wrench:'<path d="M20 6a4 4 0 0 1-5.2 3.83L7 17.6 5 19.4l-1.4-1.4L5.4 16 13.2 8.2A4 4 0 0 1 17 3l-2.6 2.6L15.4 7l2 2L20 6z"/>',
+  clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v2.4H9z"/><path d="M8.2 13l2.6 2.6L15.8 10"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  warn:'<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  download:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+  camera:'<path d="M4 8a2 2 0 0 1 2-2h1.5l1-2h7l1 2H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
+  trash:'<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
+  history:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/><path d="M4 5v4h4"/>',
+  note:'<path d="M5 3h11l4 4v14H5z"/><path d="M15 3v5h5"/><path d="M8 12h8"/><path d="M8 16h5"/>',
+};
+
+let vehicles = [];
+let activeId = null;
+let editingId = null;
+let editingOdo = false;
+let addingVehicle = false;
+let notifOn = false;
+let confirmingRemoveId = null;
+let confirmingResetId = null;
+let notifUnsupported = false;
+let currentView = 'dashboard';
+let notesSaveTimer = null;
+let saveError = null;
+let lightboxSrc = null;
+let setupBrand = '';
+let setupModel = '';
+let setupEngine = '';
+let setupName = '';
+let setupKm = '';
+
+// Intervalles typiques par marque/modèle/motorisation, à titre indicatif.
+// Ce sont des repères généraux courants sur le marché français, pas une donnée
+// officielle vérifiée pour chaque année/version : le carnet d'entretien réel du
+// Intervalles typiques par segment de véhicule et motorisation, à titre indicatif.
+// Repères généraux courants sur le marché français, pas une donnée officielle
+// vérifiée pour chaque année/version/finition : le carnet d'entretien réel du
+// véhicule reste la référence en cas de doute.
+const SEGMENT_PRESETS = {
+  citadine:    { essence:[15000,12], diesel:[18000,12], hybride:[15000,12] },
+  compacte:    { essence:[15000,12], diesel:[20000,12], hybride:[15000,12] },
+  suv_compact: { essence:[16000,12], diesel:[20000,12], hybride:[15000,12] },
+  suv:         { essence:[16000,12], diesel:[20000,12], hybride:[15000,12] },
+  monospace:   { essence:[16000,12], diesel:[20000,12], hybride:[15000,12] },
+  utilitaire:  { essence:[18000,12], diesel:[20000,12], hybride:[15000,12] },
+  sportive:    { essence:[15000,12], diesel:[18000,12], hybride:[15000,12] },
+  premium:     { essence:[25000,24], diesel:[30000,24], hybride:[20000,12] },
+  premium_suv: { essence:[25000,24], diesel:[30000,24], hybride:[20000,12] },
+};
+
+function getPreset(segment, engine){
+  if(engine === 'electrique') return { engine, reviseKm:15000, reviseMois:12 };
+  const seg = SEGMENT_PRESETS[segment] || SEGMENT_PRESETS.compacte;
+  const vals = seg[engine] || seg.essence;
+  const [km, mois] = vals;
+  return { engine, vidangeKm:km, vidangeMois:mois, reviseKm:km, reviseMois:mois, filtresKm:km };
+}
+
+const ENGINE_LABELS = { essence:'Essence', diesel:'Diesel', hybride:'Hybride', electrique:'Électrique' };
+
+// Modèle -> segment (utilisé pour dériver les intervalles selon la motorisation choisie).
+// Modèle -> segment (utilisé pour dériver les intervalles selon la motorisation choisie).
+// Inclut les gammes actuelles et de nombreux modèles plus anciens toujours en circulation.
+const MODEL_DB = {
+  "Renault": [["Twingo","citadine"],["Clio","citadine"],["Zoé","citadine"],["Captur","suv_compact"],["Mégane","compacte"],["Scénic","monospace"],["Espace","monospace"],["Kadjar","suv_compact"],["Austral","suv_compact"],["Arkana","suv_compact"],["Koleos","suv"],["Talisman","compacte"],["Kangoo","utilitaire"],["Trafic","utilitaire"],["Master","utilitaire"],["Laguna","compacte"],["Fluence","compacte"],["Clio 2","citadine"],["Clio 3","citadine"],["Clio 4","citadine"],["R19","compacte"],["R21","compacte"],["R5","citadine"],["R25","compacte"],["Safrane","compacte"],["Vel Satis","compacte"],["Avantime","compacte"],["Modus","citadine"],["Wind","sportive"],["Latitude","compacte"],["Symbol","compacte"]],
+  "Peugeot": [["106","citadine"],["107","citadine"],["108","citadine"],["205","citadine"],["206","citadine"],["207","citadine"],["208","citadine"],["301","compacte"],["305","compacte"],["306","compacte"],["307","compacte"],["308","compacte"],["309","compacte"],["405","compacte"],["406","compacte"],["407","compacte"],["408","compacte"],["504","compacte"],["505","compacte"],["508","compacte"],["604","compacte"],["605","compacte"],["607","compacte"],["806","monospace"],["807","monospace"],["1007","citadine"],["2008","suv_compact"],["3008","suv_compact"],["4007","suv"],["4008","suv_compact"],["5008","suv"],["RCZ","sportive"],["Rifter","monospace"],["Partner","utilitaire"],["Expert","utilitaire"],["Boxer","utilitaire"],["Bipper","utilitaire"]],
+  "Citroën": [["AX","citadine"],["Saxo","citadine"],["C1","citadine"],["C2","citadine"],["C3","citadine"],["C3 Aircross","suv_compact"],["C3 Picasso","monospace"],["C4","compacte"],["C4 X","compacte"],["C4 Picasso","monospace"],["C4 Cactus","suv_compact"],["C5","compacte"],["C5 Aircross","suv_compact"],["C5 X","compacte"],["C6","premium"],["C8","monospace"],["ZX","compacte"],["Xantia","compacte"],["Xsara","compacte"],["Xsara Picasso","monospace"],["Berlingo","monospace"],["SpaceTourer","monospace"],["Jumpy","utilitaire"],["Jumper","utilitaire"],["C-Elysée","compacte"],["Nemo","utilitaire"],["BX","compacte"],["Visa","citadine"]],
+  "DS": [["DS3","citadine"],["DS3 Crossback","suv_compact"],["DS4","compacte"],["DS4 Crossback","compacte"],["DS5","compacte"],["DS7","suv_compact"],["DS9","premium"]],
+  "Volkswagen": [["Lupo","citadine"],["Fox","citadine"],["Up!","citadine"],["Polo","citadine"],["Golf","compacte"],["Golf Plus","compacte"],["Jetta","compacte"],["Bora","compacte"],["Scirocco","sportive"],["Corrado","sportive"],["Beetle","citadine"],["ID.3","compacte"],["ID.4","suv_compact"],["ID.5","suv_compact"],["ID.7","compacte"],["T-Cross","suv_compact"],["T-Roc","suv_compact"],["Tiguan","suv_compact"],["Touran","monospace"],["Touareg","suv"],["Passat","compacte"],["Passat CC","compacte"],["Arteon","compacte"],["Caddy","utilitaire"],["Transporter","utilitaire"],["Sharan","monospace"],["Eos","sportive"]],
+  "Audi": [["50","citadine"],["80","premium"],["100","premium"],["A1","citadine"],["A2","citadine"],["A3","compacte"],["A4","premium"],["A5","premium"],["A6","premium"],["A7","premium"],["A8","premium"],["Q2","suv_compact"],["Q3","premium_suv"],["Q4 e-tron","premium_suv"],["Q5","premium_suv"],["Q7","premium_suv"],["Q8","premium_suv"],["e-tron","premium_suv"],["e-tron GT","premium"],["TT","sportive"],["R8","sportive"]],
+  "Mercedes-Benz": [["Classe A","premium"],["Classe B","premium"],["Classe C","premium"],["Classe E","premium"],["Classe S","premium"],["Classe V","monospace"],["CLA","premium"],["CLS","premium"],["SLK","sportive"],["SLC","sportive"],["SL","sportive"],["GLA","premium_suv"],["GLB","premium_suv"],["GLC","premium_suv"],["GLE","premium_suv"],["GLS","premium_suv"],["EQA","premium_suv"],["EQB","premium_suv"],["EQC","premium_suv"],["EQE","premium"],["EQS","premium"],["Vito","utilitaire"],["Sprinter","utilitaire"],["Citan","utilitaire"]],
+  "BMW": [["Série 1","premium"],["Série 2","premium"],["Série 3","premium"],["Série 4","premium"],["Série 5","premium"],["Série 6","premium"],["Série 7","premium"],["Série 8","premium"],["X1","premium_suv"],["X2","premium_suv"],["X3","premium_suv"],["X4","premium_suv"],["X5","premium_suv"],["X6","premium_suv"],["X7","premium_suv"],["i3","premium"],["i4","premium"],["i7","premium"],["iX","premium_suv"],["iX1","premium_suv"],["iX3","premium_suv"],["Z3","sportive"],["Z4","sportive"],["M3","sportive"],["M4","sportive"]],
+  "Mini": [["Cooper","citadine"],["Cooper S","sportive"],["One","citadine"],["Clubman","compacte"],["Countryman","suv_compact"],["Cooper SE","citadine"],["Cabrio","sportive"]],
+  "Opel": [["Kadett","citadine"],["Corsa","citadine"],["Astra","compacte"],["Vectra","compacte"],["Omega","compacte"],["Signum","compacte"],["Meriva","monospace"],["Zafira","monospace"],["Tigra","sportive"],["Crossland","suv_compact"],["Grandland","suv_compact"],["Mokka","suv_compact"],["Insignia","compacte"],["Combo","utilitaire"],["Vivaro","utilitaire"],["Movano","utilitaire"],["Adam","citadine"],["Agila","citadine"]],
+  "Ford": [["Fiesta","citadine"],["Ka","citadine"],["Ka+","citadine"],["Escort","compacte"],["Orion","compacte"],["Sierra","compacte"],["Focus","compacte"],["Mondeo","compacte"],["Scorpio","compacte"],["Cougar","sportive"],["Puma","suv_compact"],["Kuga","suv_compact"],["Ecosport","suv_compact"],["Edge","suv"],["Galaxy","monospace"],["S-Max","monospace"],["C-Max","monospace"],["Transit Connect","utilitaire"],["Transit Custom","utilitaire"],["Mustang","sportive"],["Mustang Mach-E","suv_compact"]],
+  "Fiat": [["126","citadine"],["Uno","citadine"],["Panda","citadine"],["Punto","citadine"],["500","citadine"],["500X","suv_compact"],["500L","monospace"],["Tipo","compacte"],["Bravo","compacte"],["Marea","compacte"],["Stilo","compacte"],["Croma","compacte"],["Multipla","monospace"],["Idea","citadine"],["Sedici","suv_compact"],["Doblo","utilitaire"],["Ducato","utilitaire"],["500e","citadine"]],
+  "Alfa Romeo": [["145","compacte"],["146","compacte"],["156","premium"],["159","premium"],["166","premium"],["Mito","citadine"],["Giulietta","compacte"],["Giulia","premium"],["Stelvio","premium_suv"],["Tonale","suv_compact"],["GT","sportive"],["Brera","sportive"]],
+  "Jeep": [["Renegade","suv_compact"],["Compass","suv_compact"],["Cherokee","suv"],["Grand Cherokee","suv"],["Wrangler","suv"],["Avenger","suv_compact"],["Patriot","suv_compact"]],
+  "Toyota": [["Aygo","citadine"],["Aygo X","citadine"],["Yaris","citadine"],["Yaris Cross","suv_compact"],["Corolla","compacte"],["Corolla Touring Sports","compacte"],["Auris","compacte"],["Avensis","compacte"],["Celica","sportive"],["MR2","sportive"],["C-HR","suv_compact"],["RAV4","suv"],["Highlander","suv"],["Camry","compacte"],["Prius","compacte"],["Previa","monospace"],["Verso","monospace"],["Land Cruiser","suv"],["Proace","utilitaire"],["Hilux","utilitaire"],["bZ4X","suv_compact"],["GR86","sportive"],["Supra","sportive"]],
+  "Honda": [["Civic","compacte"],["Accord","compacte"],["CR-X","sportive"],["Jazz","citadine"],["HR-V","suv_compact"],["CR-V","suv"],["S2000","sportive"],["Insight","compacte"],["e","citadine"],["ZR-V","suv_compact"],["Prelude","sportive"]],
+  "Nissan": [["Micra","citadine"],["Note","citadine"],["Almera","compacte"],["Primera","compacte"],["Juke","suv_compact"],["Qashqai","suv_compact"],["X-Trail","suv"],["Terrano","suv"],["Leaf","compacte"],["Ariya","suv_compact"],["Navara","utilitaire"],["370Z","sportive"],["350Z","sportive"],["GT-R","sportive"],["Pathfinder","suv"]],
+  "Mazda": [["323","citadine"],["626","compacte"],["Xedos","compacte"],["Mazda2","citadine"],["Mazda3","compacte"],["Mazda6","compacte"],["CX-3","suv_compact"],["CX-30","suv_compact"],["CX-5","suv"],["CX-60","suv"],["MX-5","sportive"],["RX-7","sportive"],["RX-8","sportive"],["MX-30","suv_compact"]],
+  "Suzuki": [["Celerio","citadine"],["Swift","citadine"],["Alto","citadine"],["Ignis","citadine"],["Baleno","compacte"],["Vitara","suv_compact"],["S-Cross","suv_compact"],["Jimny","suv_compact"],["Grand Vitara","suv"]],
+  "Hyundai": [["Accent","citadine"],["Getz","citadine"],["i10","citadine"],["i20","citadine"],["i30","compacte"],["Elantra","compacte"],["Matrix","monospace"],["Bayon","suv_compact"],["Kona","suv_compact"],["Tucson","suv_compact"],["Santa Fe","suv"],["Terracan","suv"],["Ioniq","compacte"],["Ioniq 5","suv_compact"],["Ioniq 6","compacte"],["H1","utilitaire"]],
+  "Kia": [["Picanto","citadine"],["Rio","citadine"],["Sephia","compacte"],["Cerato","compacte"],["Stonic","suv_compact"],["Ceed","compacte"],["XCeed","suv_compact"],["Niro","suv_compact"],["Sportage","suv_compact"],["Sorento","suv"],["Carens","monospace"],["Magentis","compacte"],["Soul","suv_compact"],["EV6","suv_compact"],["EV9","suv"]],
+  "Skoda": [["Felicia","citadine"],["Citigo","citadine"],["Fabia","citadine"],["Roomster","monospace"],["Scala","compacte"],["Octavia","compacte"],["Kamiq","suv_compact"],["Karoq","suv_compact"],["Yeti","suv_compact"],["Kodiaq","suv"],["Superb","compacte"],["Enyaq","suv_compact"]],
+  "Seat": [["Marbella","citadine"],["Mii","citadine"],["Ibiza","citadine"],["Cordoba","compacte"],["Arona","suv_compact"],["Leon","compacte"],["Toledo","compacte"],["Altea","compacte"],["Ateca","suv_compact"],["Tarraco","suv"],["Alhambra","monospace"]],
+  "Cupra": [["Formentor","suv_compact"],["Leon","compacte"],["Ateca","suv_compact"],["Born","compacte"],["Tavascan","suv_compact"]],
+  "Volvo": [["240","compacte"],["740","compacte"],["850","compacte"],["940","compacte"],["V40","compacte"],["C30","compacte"],["C70","sportive"],["S40","compacte"],["V50","compacte"],["S60","premium"],["V60","premium"],["S70","compacte"],["V70","compacte"],["S80","premium"],["S90","premium"],["V90","premium"],["XC40","premium_suv"],["XC60","premium_suv"],["XC70","premium_suv"],["XC90","premium_suv"],["EX30","premium_suv"],["EX90","premium_suv"]],
+  "Dacia": [["Solenza","citadine"],["Logan","compacte"],["Sandero","citadine"],["Sandero Stepway","suv_compact"],["Jogger","monospace"],["Duster","suv_compact"],["Spring","citadine"],["Dokker","utilitaire"],["Lodgy","monospace"]],
+  "Tesla": [["Model 3","compacte"],["Model Y","suv_compact"],["Model S","premium"],["Model X","premium_suv"]],
+  "Land Rover": [["Freelander","premium_suv"],["Evoque","premium_suv"],["Discovery Sport","premium_suv"],["Discovery","premium_suv"],["Defender","premium_suv"],["Range Rover","premium_suv"],["Range Rover Sport","premium_suv"],["Range Rover Evoque","premium_suv"],["Range Rover Velar","premium_suv"]],
+  "Jaguar": [["X-Type","premium"],["S-Type","premium"],["XE","premium"],["XF","premium"],["XJ","premium"],["F-Pace","premium_suv"],["E-Pace","premium_suv"],["I-Pace","premium_suv"],["F-Type","sportive"]],
+  "Porsche": [["718","sportive"],["911","sportive"],["Boxster","sportive"],["Cayman","sportive"],["Macan","premium_suv"],["Cayenne","premium_suv"],["Panamera","premium"],["Taycan","premium"]],
+  "Smart": [["fortwo","citadine"],["forfour","citadine"],["roadster","sportive"],["#1","suv_compact"]],
+  "MG": [["ZR","citadine"],["ZS","suv_compact"],["MG3","citadine"],["MG4","compacte"],["MG5","compacte"],["HS","suv_compact"],["Marvel R","suv_compact"]],
+  "SsangYong": [["Tivoli","suv_compact"],["Korando","suv_compact"],["Rexton","suv"],["Musso","utilitaire"],["Kyron","suv"]],
+  "Subaru": [["Impreza","compacte"],["Legacy","compacte"],["XV","suv_compact"],["Forester","suv"],["Outback","suv"],["Crosstrek","suv_compact"],["BRZ","sportive"]],
+  "Mitsubishi": [["Colt","citadine"],["Space Star","citadine"],["Lancer","compacte"],["ASX","suv_compact"],["Eclipse Cross","suv_compact"],["Outlander","suv"],["Pajero","suv"],["L200","utilitaire"]],
+  "Lexus": [["CT","premium"],["IS","premium"],["ES","premium"],["GS","premium"],["UX","premium_suv"],["NX","premium_suv"],["RX","premium_suv"],["LC","sportive"],["LS","premium"]],
+  "Alpine": [["A110","sportive"]],
+  "Abarth": [["500","sportive"],["595","sportive"],["124 Spider","sportive"]],
+  "Chevrolet": [["Matiz","citadine"],["Spark","citadine"],["Aveo","citadine"],["Lacetti","compacte"],["Cruze","compacte"],["Captiva","suv"],["Epica","compacte"]],
+  "Isuzu": [["D-Max","utilitaire"]],
+  "Iveco": [["Daily","utilitaire"]],
+  "BYD": [["Atto 3","suv_compact"],["Dolphin","citadine"],["Seal","compacte"],["Seal U","suv_compact"]],
+  "Saab": [["9-3","premium"],["9-5","premium"]],
+  "Chrysler": [["PT Cruiser","monospace"],["Voyager","monospace"],["300C","premium"]],
+  "Daihatsu": [["Sirion","citadine"],["Terios","suv_compact"],["Cuore","citadine"]],
+  "Rover": [["25","citadine"],["45","compacte"],["75","premium"],["Mini","citadine"]],
+  "Lancia": [["Ypsilon","citadine"],["Delta","compacte"],["Musa","monospace"]],
+  "Daewoo": [["Matiz","citadine"],["Lanos","citadine"],["Nubira","compacte"]],
+  "Infiniti": [["Q30","compacte"],["Q50","premium"],["QX30","premium_suv"]],
+};
+
+
+
+
+function activeVehicle(){ return vehicles.find(v=>v.id===activeId) || null; }
+
+async function loadData(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY);
+    if(res && res.value){
+      const data = JSON.parse(res.value);
+      if(data.vehicles){
+        vehicles = data.vehicles;
+        activeId = data.activeId || (vehicles[0] && vehicles[0].id);
+        notifOn = !!data.notifOn;
+      }else if(data.vehicle){
+        // migration depuis l'ancien format mono-véhicule
+        const v = { id: 'v1', name: data.vehicle.name, km: data.vehicle.km, items: data.items };
+        vehicles = [v];
+        activeId = v.id;
+      }
+      migrateItems();
+      await hydrateNoteImages();
+    }
+  }catch(e){
+    // pas encore de données enregistrées
+  }
+  render();
+}
+
+// Corrige les données déjà enregistrées avant l'ajout du verrouillage du contrôle
+// technique (et pose un filet de sécurité pour tout futur champ verrouillé).
+function migrateItems(){
+  let changed = false;
+  vehicles.forEach(v=>{
+    if(!v.history){ v.history = []; changed = true; }
+    if(!v.notes){ v.notes = []; changed = true; }
+    (v.items || []).forEach(it=>{
+      if(it.id === 'ct'){
+        if(!it.lockedMode){ it.lockedMode = true; changed = true; }
+        if(it.mode !== 'date'){ it.mode = 'date'; it.intervalKm = null; changed = true; }
+        if(!it.intervalMonths){ it.intervalMonths = 24; changed = true; }
+      }
+    });
+  });
+  if(changed) persist();
+}
+
+// Va chercher les photos de chaque note dans leur propre clé de stockage
+// (elles ne sont jamais incluses dans la sauvegarde principale, voir persist()).
+async function hydrateNoteImages(){
+  for(const v of vehicles){
+    for(const n of (v.notes || [])){
+      try{
+        const res = await window.storage.get('note-images:' + n.id);
+        n.images = (res && res.value) ? JSON.parse(res.value) : [];
+      }catch(e){
+        n.images = n.images || [];
+      }
+    }
+  }
+}
+
+// Sauvegarde principale : véhicules, entretiens, historique, texte des notes.
+// Volontairement TOUJOURS légère — les photos sont exclues d'ici et sauvegardées
+// séparément (voir persistNoteImages), pour qu'une photo trop lourde ne puisse
+// jamais empêcher le reste du carnet (kilométrage, entretiens...) d'être sauvegardé.
+function coreVehiclesPayload(){
+  return vehicles.map(v => ({
+    ...v,
+    notes: (v.notes || []).map(({ images, ...rest }) => rest),
+  }));
+}
+
+async function persist(){
+  try{
+    const payload = JSON.stringify({ vehicles: coreVehiclesPayload(), activeId, notifOn });
+    await window.storage.set(STORAGE_KEY, payload);
+    if(saveError){ saveError = null; render(); }
+  }catch(e){
+    console.error('Échec de la sauvegarde', e);
+    saveError = "La dernière sauvegarde a échoué (erreur du stockage). Réessaie dans un instant — si ça persiste, essaie de supprimer une photo dans tes notes.";
+    render();
+  }
+}
+
+// Sauvegarde des photos d'une note précise, dans sa propre clé isolée.
+// Si ça échoue (note trop lourde), seule cette note est affectée : le reste
+// du carnet (kilométrage, entretiens, historique) reste sauvegardé normalement.
+async function persistNoteImages(noteId){
+  const v = activeVehicle();
+  const n = v && (v.notes || []).find(x => x.id === noteId);
+  const images = (n && n.images) ? n.images : [];
+  try{
+    if(images.length === 0){
+      try{ await window.storage.delete('note-images:' + noteId); }catch(e){ /* rien à supprimer */ }
+    }else{
+      const payload = JSON.stringify(images);
+      if(payload.length > 4200000){
+        saveError = "Cette note contient trop de photos pour être sauvegardée. Supprime-en une pour libérer de la place.";
+        render();
+        return;
+      }
+      await window.storage.set('note-images:' + noteId, payload);
+    }
+    if(saveError){ saveError = null; render(); }
+  }catch(e){
+    console.error('Échec de la sauvegarde des photos', e);
+    saveError = "Les photos de cette note n'ont pas pu être sauvegardées, mais le reste du carnet est bien enregistré.";
+    render();
+  }
+}
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+function buildItems(km, preset){
+  let base = DEFAULT_ITEMS.map(d => ({...d}));
+
+  if(preset){
+    base = base.map(d => {
+      if(d.id === 'vidange' && preset.vidangeKm){
+        return { ...d, intervalKm: preset.vidangeKm };
+      }
+      if(d.id === 'revision' && preset.reviseKm){
+        return { ...d, intervalKm: preset.reviseKm };
+      }
+      if(d.id === 'filtres' && preset.filtresKm){
+        return { ...d, intervalKm: preset.filtresKm };
+      }
+      return d;
+    });
+    if(preset.engine === 'electrique'){
+      // pas de vidange ni de niveau d'huile sur un moteur électrique
+      base = base.filter(d => d.id !== 'vidange' && d.id !== 'niveau_huile');
+      base.push({ id:'batterie', name:'Contrôle batterie haute tension', icon:'gauge', mode:'date', intervalKm:null, intervalMonths:12 });
+    }
+  }
+
+  return base.map(d => {
+    const lastKm = d.mode === 'km' && d.intervalKm ? Math.floor(km / d.intervalKm) * d.intervalKm : km;
+    return { ...d, lastKm, lastDate: todayISO() };
+  });
+}
+
+function resetSetupState(){
+  setupBrand = ''; setupModel = ''; setupEngine = ''; setupName = ''; setupKm = '';
+}
+
+function createVehicle(name, km){
+  const k = Math.max(0, Math.round(Number(km)||0));
+  let preset = null;
+  if(setupBrand && setupModel && setupEngine && MODEL_DB[setupBrand]){
+    const entry = MODEL_DB[setupBrand].find(m => m[0] === setupModel);
+    if(entry) preset = getPreset(entry[1], setupEngine);
+  }
+  const v = {
+    id: 'v' + Date.now(),
+    name: name && name.trim() ? name.trim() : 'Ma voiture',
+    brand: setupBrand || null,
+    model: setupModel || null,
+    engine: setupEngine || null,
+    km: k,
+    items: buildItems(k, preset),
+    history: [],
+    notes: [],
+  };
+  vehicles.push(v);
+  activeId = v.id;
+  addingVehicle = false;
+  resetSetupState();
+  persist(); render();
+  maybeNotify();
+}
+
+function switchVehicle(id){ activeId = id; editingId = null; editingOdo = false; confirmingRemoveId = null; confirmingResetId = null; currentView = 'dashboard'; render(); }
+
+function removeVehicle(id){
+  confirmingRemoveId = id;
+  render();
+}
+
+function cancelRemoveVehicle(){
+  confirmingRemoveId = null;
+  render();
+}
+
+function confirmRemoveVehicle(id){
+  const v = vehicles.find(x=>x.id===id);
+  if(!v) return;
+  vehicles = vehicles.filter(x=>x.id!==id);
+  if(activeId===id) activeId = vehicles[0] ? vehicles[0].id : null;
+  confirmingRemoveId = null;
+  persist(); render();
+}
+
+function updateMileage(km){
+  const v = activeVehicle();
+  const n = Math.round(Number(km));
+  if(!isNaN(n) && n >= 0){ v.km = n; persist(); }
+  editingOdo = false; render();
+}
+
+function markDone(id){
+  const v = activeVehicle();
+  const it = v.items.find(i=>i.id===id);
+  it.lastKm = v.km;
+  it.lastDate = todayISO();
+  if(!v.history) v.history = [];
+  v.history.unshift({ id:'h'+Date.now(), itemId:it.id, itemName:it.name, itemIcon:it.icon, km:v.km, date:todayISO() });
+  editingId = null;
+  persist(); render();
+}
+
+function onEditModeChange(id, mode){
+  const kmWrap = document.getElementById('edit-int-km-wrap-'+id);
+  const dateWrap = document.getElementById('edit-int-date-wrap-'+id);
+  if(kmWrap) kmWrap.style.display = mode === 'km' ? 'flex' : 'none';
+  if(dateWrap) dateWrap.style.display = mode === 'date' ? 'flex' : 'none';
+}
+
+function saveEdit(id){
+  const v = activeVehicle();
+  const it = v.items.find(i=>i.id===id);
+  const kmVal = document.getElementById('edit-km-'+id);
+  const dateVal = document.getElementById('edit-date-'+id);
+  if(kmVal && kmVal.value !== '') it.lastKm = Math.max(0, Math.round(Number(kmVal.value)));
+  if(dateVal && dateVal.value) it.lastDate = dateVal.value;
+
+  if(it.lockedMode){
+    const intMois = document.getElementById('edit-int-mois-'+id);
+    it.mode = 'date';
+    it.intervalMonths = intMois && intMois.value !== '' ? Math.max(1, Math.round(Number(intMois.value))) : null;
+    it.intervalKm = null;
+  }else{
+    const modeChecked = document.querySelector(`input[name="edit-mode-${id}"]:checked`);
+    if(modeChecked){
+      it.mode = modeChecked.value;
+      if(it.mode === 'km'){
+        const intKm = document.getElementById('edit-int-km-'+id);
+        it.intervalKm = intKm && intKm.value !== '' ? Math.max(1, Math.round(Number(intKm.value))) : null;
+        it.intervalMonths = null;
+      }else{
+        const intMois = document.getElementById('edit-int-mois-'+id);
+        it.intervalMonths = intMois && intMois.value !== '' ? Math.max(1, Math.round(Number(intMois.value))) : null;
+        it.intervalKm = null;
+      }
+    }
+  }
+  editingId = null;
+  persist(); render();
+}
+
+function askResetCounters(id){
+  confirmingResetId = id;
+  render();
+}
+
+function cancelResetCounters(){
+  confirmingResetId = null;
+  render();
+}
+
+function confirmResetCounters(id){
+  const v = vehicles.find(x=>x.id===id);
+  if(!v) return;
+  // Remet chaque compteur à 0 (dernier entretien = aujourd'hui / kilométrage actuel)
+  // sans toucher au véhicule lui-même ni aux intervalles personnalisés.
+  v.items = v.items.map(it => ({ ...it, lastKm: v.km, lastDate: todayISO() }));
+  confirmingResetId = null;
+  persist(); render();
+}
+
+function computeStatus(item, v){
+  let percent, rem, unit;
+
+  if(item.mode === 'km'){
+    if(!item.intervalKm) return { percent: 0, status: 'ok', text: 'Pas de rappel automatique' };
+    const since = v.km - item.lastKm;
+    percent = since / item.intervalKm;
+    rem = Math.round(item.intervalKm - since);
+    unit = 'km';
+  }else{
+    if(!item.intervalMonths) return { percent: 0, status: 'ok', text: 'Pas de rappel automatique' };
+    const monthsSince = (new Date() - new Date(item.lastDate)) / (1000*60*60*24*30.44);
+    percent = monthsSince / item.intervalMonths;
+    rem = Math.round(item.intervalMonths - monthsSince);
+    unit = 'mois';
+  }
+
+  let status = 'ok';
+  if(percent >= 1) status = 'danger';
+  else if(percent >= 0.7) status = 'warn';
+
+  const remDisplay = unit === 'km' ? Math.abs(rem).toLocaleString('fr-FR') : Math.abs(rem);
+  const text = rem <= 0 ? `En retard de ${remDisplay} ${unit}` : `Dans ${remDisplay} ${unit}`;
+  return { percent: Math.min(Math.max(percent,0),1.3), status, text };
+}
+
+function ring(percent, status, size, stroke, innerHtml){
+  const r = (size - stroke)/2;
+  const c = 2*Math.PI*r;
+  const fill = Math.min(percent,1)*c;
+  const color = status==='ok' ? 'var(--ok)' : status==='warn' ? 'var(--warn)' : 'var(--danger)';
+  return `
+    <div class="ring-wrap" style="width:${size}px;height:${size}px;">
+      <svg width="${size}" height="${size}">
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="${stroke}"/>
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+          stroke-linecap="round" stroke-dasharray="${fill} ${c}"/>
+      </svg>
+      <div class="ring-center">${innerHtml}</div>
+    </div>`;
+}
+
+function overallHealth(v){
+  if(v.items.length===0) return { score:100, status:'ok', label:'Bon état' };
+  const avgPercent = v.items.reduce((s,it)=>s+computeStatus(it, v).percent,0)/v.items.length;
+  const score = Math.max(0, Math.round((1-avgPercent)*100));
+  let status='ok', label='Bon état';
+  if(score < 40){ status='danger'; label='Entretien urgent'; }
+  else if(score < 70){ status='warn'; label='À surveiller'; }
+  return { score, status, label };
+}
+
+function dueCounts(v){
+  let danger=0, warn=0;
+  v.items.forEach(it=>{
+    const s = computeStatus(it, v).status;
+    if(s==='danger') danger++; else if(s==='warn') warn++;
+  });
+  return { danger, warn };
+}
+
+/* Notifications navigateur : ne fonctionnent que si cet onglet est ouvert.
+   Pour de vraies alertes même app fermée, il faudrait une appli mobile installée. */
+async function toggleNotif(){
+  if(!('Notification' in window)){ notifUnsupported = true; render(); return; }
+  if(!notifOn){
+    const perm = await Notification.requestPermission();
+    notifOn = perm === 'granted';
+  }else{
+    notifOn = false;
+  }
+  persist(); render();
+  if(notifOn) maybeNotify(true);
+}
+
+function maybeNotify(force){
+  if(!notifOn || !('Notification' in window) || Notification.permission!=='granted') return;
+  let totalDanger=0, totalWarn=0;
+  vehicles.forEach(v=>{ const c=dueCounts(v); totalDanger+=c.danger; totalWarn+=c.warn; });
+  if(totalDanger===0 && totalWarn===0){ return; }
+  const body = totalDanger>0
+    ? `${totalDanger} entretien(s) en retard${totalWarn>0 ? `, ${totalWarn} à prévoir bientôt` : ''}`
+    : `${totalWarn} entretien(s) à prévoir bientôt`;
+  new Notification('Carnet de Bord', { body });
+}
+
+function render(){
+  const app = document.getElementById('app');
+  const bellBtn = `<button class="bell-btn ${notifOn?'on':''}" onclick="toggleNotif()" title="${notifOn?'Désactiver':'Activer'} les rappels"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.bell}</svg></button>`;
+  const pdfBtn = `<button class="bell-btn" onclick="exportPDF()" title="Exporter en PDF"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS.download}</svg></button>`;
+
+  const header = `
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">Carnet de <span>Bord</span></div>
+        <div class="brand-tag">Ton copilote entretien auto</div>
+      </div>
+      ${vehicles.length > 0 ? `<div class="header-actions">${pdfBtn}${bellBtn}</div>` : ''}
+    </div>`;
+
+  const saveErrorBanner = saveError ? `<div class="banner danger">${saveError}</div>` : '';
+  const lightboxHtml = lightboxSrc ? `
+    <div class="lightbox-backdrop" onclick="closeLightbox()">
+      <img src="${lightboxSrc}" onclick="event.stopPropagation()" />
+      <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+    </div>` : '';
+
+  if(vehicles.length === 0 || addingVehicle){
+    app.innerHTML = `
+      ${header}
+      ${saveErrorBanner}
+      ${vehicles.length > 0 ? renderTabs() : ''}
+      <div class="setup-card">
+        <h2>${vehicles.length===0 ? 'Configure ton véhicule' : 'Ajouter un véhicule'}</h2>
+        <p>Renseigne le kilométrage actuel — le carnet estime automatiquement où en est chaque entretien cyclique au lieu de repartir de zéro.</p>
+        <div class="field">
+          <label>Nom du véhicule (optionnel)</label>
+          <input id="setup-name" type="text" value="${setupName}" oninput="setupName=this.value" placeholder="Ex. Clio, 308, Twingo…" />
+        </div>
+        <div class="field">
+          <label>Marque</label>
+          <select id="setup-brand" onchange="setupBrand=this.value; setupModel=''; setupEngine=''; render()">
+            <option value="">Autre / non listé</option>
+            ${Object.keys(MODEL_DB).sort().map(b=>`<option value="${b}" ${setupBrand===b?'selected':''}>${b}</option>`).join('')}
+          </select>
+        </div>
+        ${setupBrand && MODEL_DB[setupBrand] ? `
+        <div class="field">
+          <label>Modèle</label>
+          <select id="setup-model" onchange="setupModel=this.value; setupEngine=''; render()">
+            <option value="">— Choisis un modèle —</option>
+            ${MODEL_DB[setupBrand].map(([m])=>`<option value="${m}" ${setupModel===m?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        ` : ''}
+        ${setupBrand && setupModel && MODEL_DB[setupBrand] ? `
+        <div class="field">
+          <label>Motorisation</label>
+          <select id="setup-engine" onchange="setupEngine=this.value; render()">
+            <option value="">— Choisis une motorisation —</option>
+            ${Object.entries(ENGINE_LABELS).map(([k,l])=>`<option value="${k}" ${setupEngine===k?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <p style="margin:-6px 0 16px;font-size:11.5px;">Intervalles calés sur les recommandations constructeur les plus courantes pour ce type de véhicule — vérifie toujours ton carnet d'entretien officiel, elles peuvent varier selon l'année et la version exacte.</p>
+        ` : ''}
+        <div class="field">
+          <label>Kilométrage actuel</label>
+          <input id="setup-km" type="number" min="0" value="${setupKm}" oninput="setupKm=this.value" placeholder="Ex. 84200" />
+        </div>
+        <div class="setup-actions">
+          <button class="btn btn-block" onclick="createVehicle(setupName, setupKm)">Créer le carnet</button>
+          ${vehicles.length > 0 ? `<button class="btn btn-ghost" onclick="addingVehicle=false;resetSetupState();render()">Annuler</button>` : ''}
+        </div>
+      </div>`;
+    return;
+  }
+
+  const v = activeVehicle();
+  const health = overallHealth(v);
+  const counts = dueCounts(v);
+  const heroRing = ring(health.score/100, health.status, 96, 9, `<b>${health.score}</b>`);
+
+  let bannerHtml = '';
+  if(counts.danger > 0){
+    bannerHtml = `<div class="banner danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.warn}</svg>${counts.danger} entretien(s) en retard sur ${v.name}${counts.warn>0 ? `, ${counts.warn} à prévoir bientôt` : ''}</div>`;
+  }else if(counts.warn > 0){
+    bannerHtml = `<div class="banner warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.warn}</svg>${counts.warn} entretien(s) à prévoir bientôt sur ${v.name}</div>`;
+  }else{
+    bannerHtml = `<div class="banner ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.check}</svg>Tout est à jour sur ${v.name}</div>`;
+  }
+
+  const odoBlock = editingOdo ? `
+    <div class="odo-editor">
+      <input id="odo-input" type="number" min="0" value="${v.km}" />
+      <button class="btn btn-sm" onclick="updateMileage(document.getElementById('odo-input').value)">OK</button>
+    </div>
+  ` : `
+    <div class="odo-value" onclick="editingOdo=true;render()" style="cursor:pointer;">${v.km.toLocaleString('fr-FR')} km</div>
+    <button class="btn btn-ghost btn-sm" onclick="editingOdo=true;render()">Mettre à jour</button>
+  `;
+
+  const cluster = `
+    <div class="cluster">
+      <div class="cluster-panel">
+        <div class="cluster-label">État général</div>
+        ${heroRing}
+        <div class="score-value ${health.status}">${health.label}</div>
+      </div>
+      <div class="cluster-panel">
+        <div class="vehicle-name">${v.name}${v.brand && v.model ? ` · ${v.brand} ${v.model}${v.engine ? ` (${ENGINE_LABELS[v.engine]})` : ''}` : ''}</div>
+        <div class="cluster-label">Kilométrage</div>
+        ${odoBlock}
+      </div>
+    </div>`;
+
+  const cardsHtml = v.items.map(item=>{
+    const st = computeStatus(item, v);
+    const miniRing = `<div class="ring-mini">${ring(st.percent, st.status, 40, 5, '')}</div>`;
+    const lastInfo = `Dernier: ${item.lastKm.toLocaleString('fr-FR')} km · ${formatDate(item.lastDate)}`;
+    const editOpen = editingId === item.id;
+
+    return `
+      <div class="card" data-status="${st.status}">
+        <div class="card-top">
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[item.icon]}</svg></div>
+          ${miniRing}
+        </div>
+        <div class="card-name">${item.name}</div>
+        <div class="card-status-text ${st.status}">${st.text}</div>
+        <div class="card-meta">${lastInfo}</div>
+        <div class="card-actions">
+          <button class="btn btn-sm" style="flex:1" onclick="markDone('${item.id}')">Fait aujourd'hui</button>
+          <button class="btn btn-ghost btn-sm" onclick="editingId = editingId==='${item.id}' ? null : '${item.id}'; render()">Modifier</button>
+        </div>
+        ${editOpen ? `
+          <div class="edit-form">
+            <div class="edit-section-label">Dernier entretien effectué</div>
+            <div class="edit-row">
+              <div class="edit-field">
+                <label>Kilométrage à ce moment-là</label>
+                <input id="edit-km-${item.id}" type="number" value="${item.lastKm}" />
+              </div>
+              <div class="edit-field">
+                <label>Date</label>
+                <input id="edit-date-${item.id}" type="date" value="${item.lastDate}" />
+              </div>
+            </div>
+            ${item.lockedMode ? `
+              <div class="edit-section-label">Rappel basé sur…</div>
+              <div class="edit-hint">La date, uniquement — le contrôle technique est une obligation réglementaire fixée par la date (tous les ${item.intervalMonths || 24} mois), sans lien avec le kilométrage.</div>
+              <div class="edit-row">
+                <div class="edit-field">
+                  <label>Me prévenir tous les combien de mois</label>
+                  <input id="edit-int-mois-${item.id}" type="number" placeholder="ex. 24" value="${item.intervalMonths ?? ''}" />
+                </div>
+              </div>
+            ` : `
+              <div class="edit-section-label">Rappel basé sur…</div>
+              <div class="edit-row">
+                <label class="radio-opt">
+                  <input type="radio" name="edit-mode-${item.id}" value="km" ${item.mode==='km'?'checked':''} onchange="onEditModeChange('${item.id}','km')">
+                  Le kilométrage
+                </label>
+                <label class="radio-opt">
+                  <input type="radio" name="edit-mode-${item.id}" value="date" ${item.mode==='date'?'checked':''} onchange="onEditModeChange('${item.id}','date')">
+                  La date
+                </label>
+              </div>
+              <div class="edit-row" id="edit-int-km-wrap-${item.id}" style="display:${item.mode==='km'?'flex':'none'}">
+                <div class="edit-field">
+                  <label>Me prévenir tous les combien de km</label>
+                  <input id="edit-int-km-${item.id}" type="number" placeholder="ex. 15000" value="${item.intervalKm ?? ''}" />
+                </div>
+              </div>
+              <div class="edit-row" id="edit-int-date-wrap-${item.id}" style="display:${item.mode==='date'?'flex':'none'}">
+                <div class="edit-field">
+                  <label>Me prévenir tous les combien de mois</label>
+                  <input id="edit-int-mois-${item.id}" type="number" placeholder="ex. 12" value="${item.intervalMonths ?? ''}" />
+                </div>
+              </div>
+            `}
+            <button class="btn btn-sm" onclick="saveEdit('${item.id}')">Enregistrer</button>
+          </div>
+        ` : ''}
+      </div>`;
+  }).join('');
+
+  const dashboardHtml = `
+    ${bannerHtml}
+    ${cluster}
+    <div class="section-title">Entretiens à suivre</div>
+    <div class="grid">${cardsHtml}</div>
+    <div class="vehicle-tools">
+      ${confirmingRemoveId === v.id ? `
+        <div class="confirm-box">
+          <div class="confirm-text">Supprimer « ${v.name} » et tout son historique d'entretien ? Cette action est définitive.</div>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost btn-sm" onclick="cancelRemoveVehicle()">Annuler</button>
+            <button class="btn btn-danger btn-sm" onclick="confirmRemoveVehicle('${v.id}')">Oui, supprimer</button>
+          </div>
+        </div>
+      ` : confirmingResetId === v.id ? `
+        <div class="confirm-box">
+          <div class="confirm-text">Remettre tous les compteurs de « ${v.name} » à zéro (comme si chaque entretien venait d'être fait) ? Le véhicule et tes réglages personnalisés sont conservés.</div>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost btn-sm" onclick="cancelResetCounters()">Annuler</button>
+            <button class="btn btn-danger btn-sm" onclick="confirmResetCounters('${v.id}')">Oui, tout remettre à zéro</button>
+          </div>
+        </div>
+      ` : `
+        <div class="footer-row">
+          <button class="footer-link" onclick="askResetCounters('${v.id}')">Réinitialiser les compteurs</button>
+          <button class="footer-link" onclick="removeVehicle('${v.id}')">Supprimer ce véhicule</button>
+        </div>
+      `}
+    </div>
+    <div class="save-note">Sauvegardé automatiquement</div>
+    ${notifUnsupported ? `<div class="notif-hint">Ton navigateur ne supporte pas les notifications.</div>` : ''}
+    ${notifOn ? `<div class="notif-hint">Rappels activés — ils s'affichent quand tu ouvres cette page dans un onglet. Pour être alerté même app fermée, il faudrait une vraie appli installée.</div>` : ''}
+  `;
+
+  const viewTabs = `
+    <div class="view-tabs">
+      <div class="view-tab ${currentView==='dashboard'?'active':''}" onclick="currentView='dashboard';render()">
+        Tableau de bord
+      </div>
+      <div class="view-tab ${currentView==='history'?'active':''}" onclick="currentView='history';render()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.history}</svg>Historique
+      </div>
+      <div class="view-tab ${currentView==='notes'?'active':''}" onclick="currentView='notes';render()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.note}</svg>Notes
+      </div>
+    </div>`;
+
+  const bodyHtml = currentView === 'history' ? renderHistory(v)
+                  : currentView === 'notes' ? renderNotes(v)
+                  : dashboardHtml;
+
+  app.innerHTML = `
+    ${header}
+    ${saveErrorBanner}
+    ${renderTabs()}
+    ${viewTabs}
+    ${bodyHtml}
+    ${lightboxHtml}
+  `;
+
+  if(currentView === 'notes') attachNoteListeners(v);
+}
+
+function renderHistory(v){
+  if(!v.history || v.history.length === 0){
+    return `<div class="empty-state">Aucun entretien enregistré pour l'instant.<br>Clique sur « Fait aujourd'hui » sur un poste pour commencer ton historique.</div>`;
+  }
+  const rows = v.history.map(h => `
+    <div class="history-entry">
+      <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[h.itemIcon] || ICONS.wrench}</svg></div>
+      <div class="history-main">
+        <div class="history-name">${h.itemName}</div>
+        <div class="history-meta">${h.km.toLocaleString('fr-FR')} km · ${formatDate(h.date)}</div>
+      </div>
+    </div>`).join('');
+  return `<div class="section-title">Historique — ${v.name}</div><div class="history-list">${rows}</div>`;
+}
+
+function renderNotes(v){
+  const notes = v.notes || [];
+  const noteCards = notes.map(n => `
+    <div class="note-card">
+      <textarea class="note-textarea" id="note-text-${n.id}" placeholder="Écris une note — facture, prix, remarque du garagiste…">${n.text || ''}</textarea>
+      ${n.images && n.images.length ? `
+        <div class="note-images">
+          ${n.images.map((img, i) => `
+            <div class="note-img-wrap">
+              <img src="${img}" onclick="openLightbox('${n.id}', ${i})" />
+              <button class="note-img-remove" onclick="removeNoteImage('${n.id}', ${i})">✕</button>
+            </div>`).join('')}
+        </div>
+      ` : ''}
+      <div class="note-footer">
+        <div class="note-date">${formatDate(n.updatedAt || n.createdAt)}</div>
+        <div class="note-actions">
+          <label class="note-icon-btn" title="Ajouter une photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS.camera}</svg>
+            <input type="file" accept="image/*" style="display:none" onchange="handleNoteImage('${n.id}', this.files[0])" />
+          </label>
+          <div class="note-icon-btn" title="Supprimer la note" onclick="removeNote('${n.id}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS.trash}</svg>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="section-title">Notes — ${v.name}</div>
+    <div class="notes-grid">
+      <div class="note-add-card" onclick="addNote()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">${ICONS.plus}</svg>
+        Nouvelle note
+      </div>
+      ${noteCards}
+    </div>
+    <div class="notif-hint" style="margin-top:16px;">Facture, prix payé, remarque du garagiste, photo de la pièce changée… note ce que tu veux ici, comme dans un carnet Google Keep. Sauvegarde automatique pendant que tu écris.</div>
+  `;
+}
+
+function attachNoteListeners(v){
+  (v.notes || []).forEach(n=>{
+    const el = document.getElementById('note-text-'+n.id);
+    if(el){
+      el.oninput = () => {
+        n.text = el.value;
+        n.updatedAt = todayISO();
+        clearTimeout(notesSaveTimer);
+        notesSaveTimer = setTimeout(persist, 800);
+      };
+    }
+  });
+}
+
+function renderTabs(){
+  const tabs = vehicles.map(v=>{
+    const c = dueCounts(v);
+    const dotColor = c.danger>0 ? 'var(--danger)' : c.warn>0 ? 'var(--warn)' : 'var(--ok)';
+    return `<div class="vtab ${v.id===activeId?'active':''}" onclick="switchVehicle('${v.id}')">
+      <span class="dot" style="background:${dotColor}"></span>${v.name}
+    </div>`;
+  }).join('');
+  return `<div class="vtabs">${tabs}
+    <div class="vtab add" onclick="addingVehicle=true;render()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">${ICONS.plus}</svg>
+      Ajouter
+    </div>
+  </div>`;
+}
+
+function formatDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+/* --- Notes (façon Google Keep) --- */
+function addNote(){
+  const v = activeVehicle();
+  if(!v.notes) v.notes = [];
+  v.notes.unshift({ id:'n'+Date.now(), text:'', images:[], createdAt: todayISO(), updatedAt: todayISO() });
+  persist(); render();
+}
+
+function removeNote(id){
+  const v = activeVehicle();
+  v.notes = (v.notes || []).filter(n => n.id !== id);
+  persist();
+  try{ window.storage.delete('note-images:' + id); }catch(e){ /* rien à supprimer */ }
+  render();
+}
+
+function removeNoteImage(noteId, index){
+  const v = activeVehicle();
+  const n = (v.notes || []).find(x => x.id === noteId);
+  if(n && n.images) n.images.splice(index, 1);
+  persistNoteImages(noteId);
+  render();
+}
+
+function openLightbox(noteId, index){
+  const v = activeVehicle();
+  const n = (v.notes || []).find(x => x.id === noteId);
+  if(n && n.images && n.images[index]){
+    lightboxSrc = n.images[index];
+    render();
+  }
+}
+
+function closeLightbox(){
+  lightboxSrc = null;
+  render();
+}
+
+function compressImageToDataUrl(img, maxW, quality){
+  const scale = Math.min(1, maxW / img.width);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+function handleNoteImage(noteId, file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      // Compression volontairement assez agressive : le stockage a une limite
+      // de taille, et chaque photo s'ajoute au même fichier que tout le reste
+      // du carnet. Un second passage plus fort s'applique si besoin.
+      let dataUrl = compressImageToDataUrl(img, 700, 0.6);
+      if(dataUrl.length > 500000){
+        dataUrl = compressImageToDataUrl(img, 480, 0.45);
+      }
+      if(dataUrl.length > 700000){
+        saveError = "Cette photo reste trop volumineuse même compressée. Essaie une photo moins détaillée, ou prends-la d'un peu plus loin.";
+        render();
+        return;
+      }
+      const v = activeVehicle();
+      const n = (v.notes || []).find(x => x.id === noteId);
+      if(n){
+        if(!n.images) n.images = [];
+        n.images.push(dataUrl);
+        n.updatedAt = todayISO();
+        persist();
+        persistNoteImages(noteId);
+        render();
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* --- Export PDF : générateur autonome, sans librairie ni réseau externe ---
+   (jsPDF chargé depuis un CDN était bloqué par le bac à sable de cet aperçu,
+   exactement comme confirm()/alert() — on construit donc le fichier PDF
+   nous-mêmes, en pur JavaScript, avec la police standard Helvetica.) */
+
+function pdfEscapeText(str){
+  return str.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function pdfCleanText(str){
+  return String(str)
+    .replace(/—|–/g, '-')
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/…/g, '...')
+    .replace(/[\u00A0\u202F\u2007\u2009]/g, ' ')
+    .split('').map(ch => ch.charCodeAt(0) < 256 ? ch : '?').join('');
+}
+
+function pdfCharWidth(size){ return size * 0.5; } // largeur moyenne approximative Helvetica
+
+function pdfWrapText(text, size, maxWidth){
+  const maxChars = Math.max(10, Math.floor(maxWidth / pdfCharWidth(size)));
+  const words = String(text).split(' ');
+  const lines = [];
+  let cur = '';
+  words.forEach(w=>{
+    const test = cur ? cur + ' ' + w : w;
+    if(test.length > maxChars && cur){ lines.push(cur); cur = w; }
+    else cur = test;
+  });
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+function buildPdfBlocks(v){
+  const blocks = [];
+  const push = (text, font, size) => blocks.push({ text, font, size });
+  const spacer = (size) => blocks.push({ text:'', font:'F1', size });
+
+  push('Carnet de Bord', 'F2', 20);
+  const subtitle = v.brand && v.model
+    ? `${v.name} - ${v.brand} ${v.model}${v.engine ? ` (${ENGINE_LABELS[v.engine]})` : ''}`
+    : v.name;
+  push(subtitle, 'F1', 12);
+  push(`Kilometrage actuel : ${v.km.toLocaleString('fr-FR')} km`, 'F1', 11);
+  push(`Export du ${new Date().toLocaleDateString('fr-FR')}`, 'F1', 9);
+  spacer(8);
+
+  push('Etat des entretiens', 'F2', 14);
+  spacer(4);
+  v.items.forEach(it=>{
+    const st = computeStatus(it, v);
+    push(`${it.name} - dernier : ${it.lastKm.toLocaleString('fr-FR')} km (${formatDate(it.lastDate)}) - ${st.text}`, 'F1', 10);
+  });
+  spacer(8);
+
+  push('Historique des entretiens realises', 'F2', 14);
+  spacer(4);
+  if(!v.history || v.history.length === 0){
+    push("Aucun entretien enregistre pour l'instant.", 'F1', 10);
+  }else{
+    v.history.forEach(h=>{
+      push(`${formatDate(h.date)} - ${h.itemName} - ${h.km.toLocaleString('fr-FR')} km`, 'F1', 9.5);
+    });
+  }
+
+  const notesWithText = (v.notes || []).filter(n => n.text && n.text.trim());
+  if(notesWithText.length){
+    spacer(8);
+    push('Notes', 'F2', 14);
+    spacer(4);
+    notesWithText.forEach(n=>{
+      const wrapped = pdfWrapText(`${formatDate(n.updatedAt || n.createdAt)} - ${n.text}`, 9.5, 495);
+      wrapped.forEach(line => push(line, 'F1', 9.5));
+    });
+  }
+
+  return blocks;
+}
+
+function paginatePdfBlocks(blocks){
+  const marginL = 50, topY = 792, bottomY = 50;
+  const pages = [];
+  let current = [];
+  let y = topY;
+  blocks.forEach(b=>{
+    const lineH = b.size * 1.45;
+    if(b.text === ''){
+      y -= lineH * 0.5;
+      return;
+    }
+    if(y - lineH < bottomY){
+      pages.push(current);
+      current = [];
+      y = topY;
+    }
+    current.push({ text: b.text, font: b.font, size: b.size, x: marginL, y });
+    y -= lineH;
+  });
+  if(current.length) pages.push(current);
+  if(pages.length === 0) pages.push([]);
+  return pages;
+}
+
+function buildPdfPageContent(lines){
+  let s = '';
+  lines.forEach(l=>{
+    const clean = pdfEscapeText(pdfCleanText(l.text));
+    s += `BT /${l.font} ${l.size} Tf 1 0 0 1 ${l.x} ${l.y.toFixed(2)} Tm (${clean}) Tj ET\n`;
+  });
+  return s;
+}
+
+function buildPdfDocument(pages){
+  const N = pages.length;
+  const catalogNum = 1, pagesNum = 2;
+  const pageNums = Array.from({length:N}, (_, i) => 3 + i);
+  const contentNums = Array.from({length:N}, (_, i) => 3 + N + i);
+  const fontF1Num = 3 + 2*N, fontF2Num = 3 + 2*N + 1;
+  const maxObjNum = fontF2Num;
+
+  let out = '%PDF-1.4\n';
+  const offsets = {};
+  function addObj(num, body){
+    offsets[num] = out.length;
+    out += `${num} 0 obj\n${body}\nendobj\n`;
+  }
+
+  addObj(catalogNum, `<< /Type /Catalog /Pages ${pagesNum} 0 R >>`);
+  addObj(pagesNum, `<< /Type /Pages /Kids [${pageNums.map(n=>n+' 0 R').join(' ')}] /Count ${N} >>`);
+  pages.forEach((lines, i)=>{
+    const content = buildPdfPageContent(lines);
+    addObj(pageNums[i], `<< /Type /Page /Parent ${pagesNum} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontF1Num} 0 R /F2 ${fontF2Num} 0 R >> >> /Contents ${contentNums[i]} 0 R >>`);
+    addObj(contentNums[i], `<< /Length ${content.length} >>\nstream\n${content}endstream`);
+  });
+  addObj(fontF1Num, `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`);
+  addObj(fontF2Num, `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>`);
+
+  const xrefStart = out.length;
+  let xref = `xref\n0 ${maxObjNum + 1}\n0000000000 65535 f \n`;
+  for(let n = 1; n <= maxObjNum; n++){
+    xref += String(offsets[n]).padStart(10, '0') + ' 00000 n \n';
+  }
+  out += xref;
+  out += `trailer\n<< /Size ${maxObjNum + 1} /Root ${catalogNum} 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return out;
+}
+
+function exportPDF(){
+  const v = activeVehicle();
+  if(!v) return;
+  const blocks = buildPdfBlocks(v);
+  const pages = paginatePdfBlocks(blocks);
+  const pdfString = buildPdfDocument(pages);
+
+  const bytes = new Uint8Array(pdfString.length);
+  for(let i = 0; i < pdfString.length; i++) bytes[i] = pdfString.charCodeAt(i) & 0xFF;
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `carnet-${(v.name || 'vehicule').replace(/\s+/g,'_')}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+loadData();
+
+// Le service worker ne s'enregistre que si le fichier est réellement hébergé
+// (http/https) — inutile et sans effet dans l'aperçu Claude.
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Pas grave si ça échoue : l'appli fonctionne très bien sans, juste sans mode hors-ligne.
+    });
+  });
+}
+</script>
+</body>
+</html>
