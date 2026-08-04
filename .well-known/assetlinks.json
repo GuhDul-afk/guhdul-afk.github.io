@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "io.github.guhdul_afk.twa",
-        "sha256_cert_fingerprints": ["00:E3:EA:FB:F1:A0:E1:B9:B4:B6:7E:D5:20:2E:C2:60:0A:46:8A:A3:14:20:50:5D:00:11:4D:5A:54:AB:41:6C"]
+        "sha256_cert_fingerprints": ["E9:CC:FE:F7:C4:40:EF:BC:F4:02:C2:3C:86:F0:57:71:08:70:53:31:5E:29:9B:6E:46:11:4E:0B:F5:BF:BB:60"]
       }
     }]
