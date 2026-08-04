@@ -315,14 +315,15 @@ if(typeof window.storage === 'undefined'){
 const STORAGE_KEY = 'car-data';
 
 const DEFAULT_ITEMS = [
-  { id:'vidange',     name:'Vidange moteur',            icon:'drop',    mode:'km',   intervalKm:10000, intervalMonths:null },
-  { id:'niveau_huile',name:"Niveau d'huile",             icon:'gauge',   mode:'km',   intervalKm:1000,  intervalMonths:null },
-  { id:'pression',    name:'Pression des pneus',         icon:'gauge',   mode:'date', intervalKm:null,  intervalMonths:1    },
-  { id:'usure_pneus', name:'Usure des pneus',            icon:'tire',    mode:'km',   intervalKm:5000,  intervalMonths:null },
-  { id:'filtres',     name:'Filtres (air / habitacle)',  icon:'filter',  mode:'km',   intervalKm:15000, intervalMonths:null },
-  { id:'freins',      name:'Plaquettes de frein',        icon:'disc',    mode:'km',   intervalKm:20000, intervalMonths:null },
-  { id:'revision',    name:'Révision générale',          icon:'wrench',  mode:'km',   intervalKm:20000, intervalMonths:null },
-  { id:'ct',          name:'Contrôle technique',         icon:'clipboard',mode:'date',intervalKm:null,  intervalMonths:24,  lockedMode:true },
+  { id:'vidange',       name:'Vidange moteur',            icon:'drop',    mode:'km',   intervalKm:10000, intervalMonths:null },
+  { id:'vidange_boite', name:'Vidange boîte de vitesses', icon:'drop',    mode:'km',   intervalKm:60000, intervalMonths:null },
+  { id:'niveau_huile',  name:"Niveau d'huile",             icon:'gauge',   mode:'km',   intervalKm:1000,  intervalMonths:null },
+  { id:'pression',      name:'Pression des pneus',         icon:'gauge',   mode:'date', intervalKm:null,  intervalMonths:1    },
+  { id:'usure_pneus',   name:'Usure des pneus',            icon:'tire',    mode:'km',   intervalKm:5000,  intervalMonths:null },
+  { id:'filtres',       name:'Filtres (air / habitacle)',  icon:'filter',  mode:'km',   intervalKm:15000, intervalMonths:null },
+  { id:'freins',        name:'Plaquettes de frein',        icon:'disc',    mode:'km',   intervalKm:20000, intervalMonths:null },
+  { id:'revision',      name:'Révision générale',          icon:'wrench',  mode:'km',   intervalKm:20000, intervalMonths:null },
+  { id:'ct',            name:'Contrôle technique',         icon:'clipboard',mode:'date',intervalKm:null,  intervalMonths:24,  lockedMode:true },
 ];
 
 const ICONS = {
@@ -490,6 +491,12 @@ function migrateItems(){
         if(!it.intervalMonths){ it.intervalMonths = 24; changed = true; }
       }
     });
+    if(!v.items.some(it => it.id === 'vidange_boite')){
+      const def = DEFAULT_ITEMS.find(d => d.id === 'vidange_boite');
+      const lastKm = Math.floor(v.km / def.intervalKm) * def.intervalKm;
+      v.items.push({ ...def, lastKm, lastDate: todayISO() });
+      changed = true;
+    }
   });
   if(changed) persist();
 }
