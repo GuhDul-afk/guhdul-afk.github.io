@@ -191,6 +191,14 @@
      page (le navigateur ne laisse pas le CSS le personnaliser) — on force donc
      un texte foncé pour ces options précises, sinon texte clair sur fond clair. */
   .field select option{ color:#111; background:#fff; }
+  .data-source-note{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;line-height:1.5;padding:11px 13px;border-radius:12px;margin:-4px 0 16px;border:1px solid;}
+  .data-source-note svg{width:15px;height:15px;flex-shrink:0;margin-top:1px;}
+  .data-source-note.ok{background:rgba(48,209,88,0.10);border-color:rgba(48,209,88,0.3);color:var(--text-dim);}
+  .data-source-note.ok svg{stroke:var(--ok);}
+  .data-source-note.generic{background:rgba(255,159,10,0.10);border-color:rgba(255,159,10,0.3);color:var(--text-dim);}
+  .data-source-note.generic svg{stroke:var(--warn);}
+  .vehicle-data-badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text-dim);opacity:0.75;margin-top:2px;}
+  .vehicle-data-badge svg{width:11px;height:11px;flex-shrink:0;}
   .field input:focus, .field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,225,203,0.18);}
   .setup-actions{display:flex;gap:8px;}
   .btn{
@@ -379,6 +387,7 @@ const ICONS = {
   refresh:'<path d="M3 12a9 9 0 0 1 15.3-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.36L3 16"/><path d="M3 21v-5h5"/>',
   sun:'<circle cx="12" cy="12" r="4.5"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/><line x1="4.9" y1="4.9" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.1" y2="4.9"/>',
   moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
+  info:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle cx="12" cy="7.8" r="0.5" fill="currentColor"/>',
 };
 
 let vehicles = [];
@@ -422,12 +431,54 @@ const SEGMENT_PRESETS = {
   premium_suv: { essence:[25000,24], diesel:[30000,24], hybride:[20000,12] },
 };
 
-function getPreset(segment, engine){
-  if(engine === 'electrique') return { engine, reviseKm:15000, reviseMois:12 };
+// Intervalles réels constructeur, regroupés par famille de moteurs partagée
+// (les groupes automobiles réutilisent souvent les mêmes blocs moteurs d'une
+// marque à l'autre : PureTech chez Peugeot/Citroën/DS/Opel/Fiat, TSI/TDI chez
+// Volkswagen/Audi/Seat/Cupra/Skoda, etc.) — vérifiés via des sources publiques
+// (RTA/Haynes, sites constructeur, guides spécialisés) début août 2026.
+// Quand une marque n'apparaît pas ici, l'appli retombe sur une estimation
+// générique par segment (voir SEGMENT_PRESETS) et le signale à l'utilisateur.
+const BRAND_GROUPS = {
+  'Peugeot':'psa', 'Citroën':'psa', 'DS':'psa', 'Opel':'psa', 'Fiat':'psa', 'Abarth':'psa',
+  'Renault':'renault', 'Dacia':'renault', 'Alpine':'renault',
+  'Volkswagen':'vw', 'Audi':'vw', 'Seat':'vw', 'Cupra':'vw', 'Skoda':'vw',
+  'Ford':'ford',
+  'Toyota':'toyota', 'Lexus':'toyota',
+  'BMW':'bmw', 'Mini':'bmw',
+  'Mercedes-Benz':'mercedes', 'Smart':'mercedes',
+  'Hyundai':'hyundai_kia', 'Kia':'hyundai_kia',
+  'Volvo':'volvo',
+};
+
+const GROUP_PRESETS = {
+  psa:         { essence:[20000,12], diesel:[30000,24], hybride:[20000,12], label:"Peugeot/Citroën/DS/Opel/Fiat — moteurs PureTech (essence) et BlueHDi (diesel)" },
+  renault:     { essence:[15000,12], diesel:[20000,12], hybride:[15000,12], label:"Renault/Dacia/Alpine — moteurs TCe (essence), Blue dCi (diesel), E-Tech (hybride)" },
+  vw:          { essence:[15000,12], diesel:[15000,12], hybride:[15000,12], label:"Groupe Volkswagen — service à intervalle fixe (TSI/TDI)" },
+  ford:        { essence:[30000,24], diesel:[30000,24], hybride:[30000,24], label:"Ford — plan d'entretien constructeur (EcoBoost/EcoBlue)" },
+  toyota:      { essence:[15000,12], diesel:[15000,12], hybride:[15000,12], label:"Toyota/Lexus — carnet constructeur" },
+  bmw:         { essence:[25000,24], diesel:[30000,24], hybride:[25000,24], label:"BMW/Mini — Condition Based Service" },
+  mercedes:    { essence:[20000,12], diesel:[20000,12], hybride:[20000,12], label:"Mercedes-Benz/Smart — programme ASSYST (Service A)" },
+  hyundai_kia: { essence:[15000,12], diesel:[15000,12], hybride:[15000,12], label:"Hyundai/Kia — carnet constructeur" },
+  volvo:       { essence:[30000,12], diesel:[30000,12], hybride:[30000,12], label:"Volvo — carnet constructeur (modèles récents)" },
+};
+
+function getPreset(brand, segment, engine){
+  if(engine === 'electrique') return { engine, reviseKm:15000, reviseMois:12, dataSource:'electrique' };
+
+  const group = BRAND_GROUPS[brand];
+  const groupData = group && GROUP_PRESETS[group];
+  if(groupData && groupData[engine]){
+    const [km, mois] = groupData[engine];
+    return {
+      engine, vidangeKm:km, vidangeMois:mois, reviseKm:km, reviseMois:mois, filtresKm:km,
+      dataSource:'constructeur', sourceLabel: groupData.label,
+    };
+  }
+
   const seg = SEGMENT_PRESETS[segment] || SEGMENT_PRESETS.compacte;
   const vals = seg[engine] || seg.essence;
   const [km, mois] = vals;
-  return { engine, vidangeKm:km, vidangeMois:mois, reviseKm:km, reviseMois:mois, filtresKm:km };
+  return { engine, vidangeKm:km, vidangeMois:mois, reviseKm:km, reviseMois:mois, filtresKm:km, dataSource:'generique' };
 }
 
 const ENGINE_LABELS = { essence:'Essence', diesel:'Diesel', hybride:'Hybride', electrique:'Électrique' };
@@ -551,6 +602,27 @@ function migrateItems(){
       v.items.push({ ...def, lastKm, lastDate: todayISO() });
       changed = true;
     }
+    // Ne s'exécute qu'une fois par véhicule (dataSource absent = créé avant
+    // l'ajout des données constructeur réelles). Si la marque est désormais
+    // couverte, on met à jour les intervalles vidange/révision pour refléter
+    // les vraies préconisations — sans toucher aux dates de dernier passage,
+    // qui restent telles quelles.
+    if(!v.dataSource){
+      let computedPreset = null;
+      if(v.brand && v.model && v.engine && MODEL_DB[v.brand]){
+        const entry = MODEL_DB[v.brand].find(m => m[0] === v.model);
+        if(entry) computedPreset = getPreset(v.brand, entry[1], v.engine);
+      }
+      v.dataSource = computedPreset ? computedPreset.dataSource : 'generique';
+      v.dataSourceLabel = computedPreset ? (computedPreset.sourceLabel || null) : null;
+      if(computedPreset && computedPreset.dataSource === 'constructeur'){
+        (v.items || []).forEach(it=>{
+          if(it.id === 'vidange' && it.mode === 'km') it.intervalKm = computedPreset.vidangeKm;
+          if(it.id === 'revision' && it.mode === 'km') it.intervalKm = computedPreset.reviseKm;
+        });
+      }
+      changed = true;
+    }
   });
   if(changed) persist();
 }
@@ -660,7 +732,7 @@ function createVehicle(name, km){
   let preset = null;
   if(setupBrand && setupModel && setupEngine && MODEL_DB[setupBrand]){
     const entry = MODEL_DB[setupBrand].find(m => m[0] === setupModel);
-    if(entry) preset = getPreset(entry[1], setupEngine);
+    if(entry) preset = getPreset(setupBrand, entry[1], setupEngine);
   }
   const v = {
     id: 'v' + Date.now(),
@@ -672,6 +744,8 @@ function createVehicle(name, km){
     items: buildItems(k, preset),
     history: [],
     notes: [],
+    dataSource: preset ? preset.dataSource : 'generique',
+    dataSourceLabel: preset ? (preset.sourceLabel || null) : null,
   };
   vehicles.push(v);
   activeId = v.id;
@@ -920,6 +994,11 @@ function render(){
     </div>` : '';
 
   if(vehicles.length === 0 || addingVehicle){
+    let presetPreview = null;
+    if(setupBrand && setupModel && setupEngine && MODEL_DB[setupBrand]){
+      const previewEntry = MODEL_DB[setupBrand].find(m => m[0] === setupModel);
+      if(previewEntry) presetPreview = getPreset(setupBrand, previewEntry[1], setupEngine);
+    }
     app.innerHTML = `
       ${header}
       ${saveErrorBanner}
@@ -956,7 +1035,17 @@ function render(){
             ${Object.entries(ENGINE_LABELS).map(([k,l])=>`<option value="${k}" ${setupEngine===k?'selected':''}>${l}</option>`).join('')}
           </select>
         </div>
-        <p style="margin:-6px 0 16px;font-size:11.5px;">Intervalles calés sur les recommandations constructeur les plus courantes pour ce type de véhicule — vérifie toujours ton carnet d'entretien officiel, elles peuvent varier selon l'année et la version exacte.</p>
+        ${presetPreview && presetPreview.dataSource === 'constructeur' ? `
+          <div class="data-source-note ok">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.check}</svg>
+            <span>Intervalles basés sur des données constructeur réelles : ${presetPreview.sourceLabel}. Vérifie toujours ton carnet d'entretien officiel, certains détails peuvent varier selon l'année et la version exacte.</span>
+          </div>
+        ` : presetPreview && presetPreview.dataSource === 'generique' ? `
+          <div class="data-source-note generic">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.info}</svg>
+            <span>Pas de données constructeur spécifiques trouvées pour cette marque — les intervalles proposés sont des estimations génériques par catégorie de véhicule. Modifiables à tout moment après création (bouton "Modifier" sur chaque poste).</span>
+          </div>
+        ` : ''}
         ` : ''}
         <div class="field">
           <label>Kilométrage actuel</label>
@@ -1003,6 +1092,12 @@ function render(){
       </div>
       <div class="cluster-panel">
         <div class="vehicle-name">${v.name}${v.brand && v.model ? ` · ${v.brand} ${v.model}${v.engine ? ` (${ENGINE_LABELS[v.engine]})` : ''}` : ''}</div>
+        ${v.dataSource === 'generique' ? `
+          <div class="vehicle-data-badge" title="Aucune donnée constructeur spécifique trouvée pour cette marque — intervalles estimés par catégorie de véhicule, modifiables à tout moment.">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.info}</svg>
+            Intervalles génériques (modifiables)
+          </div>
+        ` : ''}
         <div class="cluster-label">Kilométrage</div>
         ${odoBlock}
       </div>
