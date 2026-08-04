@@ -263,6 +263,15 @@
   .odo-editor input{width:110px;text-align:center;}
 
   .vehicle-tools{text-align:center;margin-top:6px;}
+  .add-item-zone{margin-top:18px;text-align:center;}
+  .add-item-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);opacity:0.7;margin-bottom:10px;}
+  .add-item-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+  .add-item-pill{
+    background:var(--panel); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+    border:1px dashed var(--line); border-radius:999px; padding:7px 14px; font-size:12px; color:var(--accent);
+    cursor:pointer; font-family:var(--font-body);
+  }
+  .add-item-pill:hover{border-color:var(--accent);background:var(--accent-dim);}
   .footer-link{display:inline-block;text-align:center;margin-top:34px;font-size:11.5px;color:var(--text-dim);opacity:0.7;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:var(--font-body);}
   .footer-link:hover{opacity:1;color:var(--text);}
   .footer-row{display:flex;justify-content:center;gap:18px;}
@@ -353,6 +362,7 @@ let addingVehicle = false;
 let notifOn = false;
 let confirmingRemoveId = null;
 let confirmingResetId = null;
+let confirmingRemoveItemId = null;
 let notifUnsupported = false;
 let currentView = 'dashboard';
 let notesSaveTimer = null;
@@ -627,7 +637,7 @@ function createVehicle(name, km){
   maybeNotify();
 }
 
-function switchVehicle(id){ activeId = id; editingId = null; editingOdo = false; confirmingRemoveId = null; confirmingResetId = null; currentView = 'dashboard'; render(); }
+function switchVehicle(id){ activeId = id; editingId = null; editingOdo = false; confirmingRemoveId = null; confirmingResetId = null; confirmingRemoveItemId = null; currentView = 'dashboard'; render(); }
 
 function removeVehicle(id){
   confirmingRemoveId = id;
@@ -663,6 +673,36 @@ function markDone(id){
   if(!v.history) v.history = [];
   v.history.unshift({ id:'h'+Date.now(), itemId:it.id, itemName:it.name, itemIcon:it.icon, km:v.km, date:todayISO() });
   editingId = null;
+  persist(); render();
+}
+
+function askRemoveItem(id){
+  confirmingRemoveItemId = id;
+  render();
+}
+
+function cancelRemoveItem(){
+  confirmingRemoveItemId = null;
+  render();
+}
+
+function confirmRemoveItem(id){
+  const v = activeVehicle();
+  v.items = v.items.filter(it => it.id !== id);
+  editingId = null;
+  confirmingRemoveItemId = null;
+  persist(); render();
+}
+
+// Permet de rajouter un suivi par défaut retiré précédemment (ré-estime son
+// dernier passage probable, comme à la création du véhicule, plutôt que de
+// repartir de zéro et déclencher une fausse alerte immédiate).
+function addBackItem(defId){
+  const v = activeVehicle();
+  const def = DEFAULT_ITEMS.find(d => d.id === defId);
+  if(!def || v.items.some(it => it.id === defId)) return;
+  const lastKm = def.mode === 'km' && def.intervalKm ? Math.floor(v.km / def.intervalKm) * def.intervalKm : v.km;
+  v.items.push({ ...def, lastKm, lastDate: todayISO() });
   persist(); render();
 }
 
@@ -941,6 +981,15 @@ function render(){
         </div>
         ${editOpen ? `
           <div class="edit-form">
+            ${confirmingRemoveItemId === item.id ? `
+              <div class="confirm-box" style="margin-top:0;">
+                <div class="confirm-text">Retirer le suivi « ${item.name} » de ce véhicule ? Tu pourras le rajouter plus tard depuis le bas du tableau de bord si besoin.</div>
+                <div class="confirm-actions">
+                  <button class="btn btn-ghost btn-sm" onclick="cancelRemoveItem()">Annuler</button>
+                  <button class="btn btn-danger btn-sm" onclick="confirmRemoveItem('${item.id}')">Oui, retirer</button>
+                </div>
+              </div>
+            ` : `
             <div class="edit-section-label">Dernier entretien effectué</div>
             <div class="edit-row">
               <div class="edit-field">
@@ -987,16 +1036,29 @@ function render(){
               </div>
             `}
             <button class="btn btn-sm" onclick="saveEdit('${item.id}')">Enregistrer</button>
+            <button class="footer-link" style="margin-top:4px;" onclick="askRemoveItem('${item.id}')">Retirer ce suivi de ce véhicule</button>
+            `}
           </div>
         ` : ''}
       </div>`;
   }).join('');
+
+  const missingDefaults = DEFAULT_ITEMS.filter(d => !v.items.some(it => it.id === d.id));
+  const addItemHtml = missingDefaults.length ? `
+    <div class="add-item-zone">
+      <div class="add-item-label">Ajouter un suivi retiré</div>
+      <div class="add-item-row">
+        ${missingDefaults.map(d => `<button class="add-item-pill" onclick="addBackItem('${d.id}')">+ ${d.name}</button>`).join('')}
+      </div>
+    </div>
+  ` : '';
 
   const dashboardHtml = `
     ${bannerHtml}
     ${cluster}
     <div class="section-title">Entretiens à suivre</div>
     <div class="grid">${cardsHtml}</div>
+    ${addItemHtml}
     <div class="vehicle-tools">
       ${confirmingRemoveId === v.id ? `
         <div class="confirm-box">
